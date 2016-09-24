@@ -1,0 +1,39 @@
+\documentclass[letterpaper, 12pt]{article}
+\usepackage[letterpaper]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[doublespacing]{setspace}
+\title{Parallel Sorting of Roughly-Sorted Sequences\\CSCI 5172 Fall '16 Project}
+\author{Anthony Pfaff, Jason Treadwell}
+
+\begin{document}
+\maketitle
+
+% TODO: rewrite away the proposal text
+Sorting a collection according to some ordering among its items is among the most classic problems of computer science.
+A well-established result is the linearithmic  (i.e.\ $O(n \lg n)$) optimal upper bound for sorting sequences of length $n$ by
+  comparison.
+Commonly-used sorting algorithms such as Mergesort and Quicksort have $\Theta(n \lg n)$ and $\Omega(n \lg n)$ runtimes,
+  respectively.
+
+We can exploit the ordering of \textit{roughly-sorted} sequences to sort them in $O(n \lg k)$ time, where $k$ is the
+  \textit{radius} of a sequence $S$ or the smallest $k$ such that $S$ is $k$-\textit{sorted}.\cite{altman89}
+A $k$-sorted sequence $\{a_0, a_1, \cdots, a_n\}$ satisfies $a_i \leq a_j \;\forall\; 1 \leq i \leq j \leq n, i \leq j - k$.
+Since an unsorted sequence can be at most $n$-sorted, the worst-case runtime of this algorithm has complexity $O(n \lg n)$.
+
+We intend to study and implement sorting of roughly-sorted sequences using both sequential and parallel\cite{altman90} versions
+  of the algorithm. In particular, I shall investigate the applicability of the method over very large sequences,
+  accelerated using graphics hardware. A GPU is dedicated graphics hardware that also excels at performing frequent, basic
+  computations over large amounts of data. The use of GPUs for numerical applications is a recent and rapidly-growing development
+  in computer science and software engineering. Suitable hardware is now commonly available in consumer devices and may herald a
+  paradigm shift in how we efficiently perform common and indispensable tasks like sorting.
+
+I propose to develop implementations of the method using C and Nvidia's CUDA framework, comparing the results with sequential
+  implementations running on both the GPU and CPU as well as with the classic Mergesort and Quicksort algorithms. If time
+  permits, I would also like to compare the method to parallel versions of the latter two algorithms.
+
+\bibliographystyle{plain}
+\nocite{*}
+\bibliography{refs} % bib database
+
+\end{document}

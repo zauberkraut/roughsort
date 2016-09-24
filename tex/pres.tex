@@ -1,0 +1,58 @@
+\documentclass[10pt, xcolor={dvipsnames}, aspectratio=169]{beamer}
+\usefonttheme[onlymath]{serif}
+\usepackage[utf8]{inputenc}
+\usepackage[super, square]{natbib}
+\usepackage{mathtools, relsize, graphicx, amssymb, amsthm}
+\usepackage{listings}
+\usepackage{color}
+
+\lstset{
+    frame=single,
+    basicstyle=\footnotesize,
+    keywordstyle=\color{purple},
+    numbers=left,
+    numbersep=5pt,
+    showstringspaces=false, 
+    stringstyle=\color{blue},
+    tabsize=4,
+    language=C++
+}
+
+\mode<presentation>{\usetheme{Berlin} \usecolortheme{beetle}}
+
+\title{Parallel Sorting of Roughly-Sorted Sequences}
+\author{Anthony Pfaff, Jason Treadwell}
+\institute{CSCI 5172 $|$ CU Denver $|$ Fall '16}
+\date{11.??.2016}
+
+\begin{document}
+\setbeamertemplate{navigation symbols}{} %remove navigation symbols
+\bibliographystyle{plain}
+\nocite{*}
+% gets rid of the references button
+\renewcommand{\bibsection}{\subsubsection*{\bibname}}
+\graphicspath{{./}}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}
+\transfade
+\frametitle{Introduction}
+% TODO: rewrite this
+Sorting a collection according to some ordering among its items is among the most classic problems of computer science.
+A well-established result is the linearithmic  (i.e.\ $O(n \lg n)$) optimal upper bound for sorting sequences of length $n$ by
+  comparison.
+\end{frame}
+
+\begin{frame}
+\frametitle{References}
+\smaller[1]{\bibliography{refs}}
+\end{frame}
+
+\begin{frame}
+\frametitle{Demo}
+\end{frame}
+
+\end{document}
