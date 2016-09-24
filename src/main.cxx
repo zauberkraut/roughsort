@@ -11,7 +11,7 @@
 
 // for dealing with getopt arguments
 extern char *optarg;
-extern int optind, opterr, optopt;
+extern int optopt;
 
 namespace {
 
