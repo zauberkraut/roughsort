@@ -20,5 +20,5 @@ To build with debugging symbols:
 To run unit tests:  
 `make test`
 
-For usage instructions, run (after building):
+For usage instructions, run (after building):  
 `roughsort`
