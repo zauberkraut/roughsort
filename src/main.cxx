@@ -45,12 +45,6 @@ int msSince(timespec* start) {
          (time.tv_nsec - start->tv_nsec)/1.e6;
 }
 
-class Benchmark {
-public:
-  const char* name;
-  void (*sort)(int*, int);
-};
-
 [[ noreturn ]] void usage() {
   msg("roughsort [options]\n"
       "  -h        These instructions\n"
@@ -112,19 +106,23 @@ int main(int argc, char* argv[]) {
   const auto arraySize = sizeof(*unsortedArray) * arrayLen;
   randArray(unsortedArray, arrayLen);
 
-  Benchmark benchs[] = {
-    {"CPU Mergesort", hostMergesort},
-    {"CPU Quicksort (cstdlib)", hostQuicksortC},
-    {"CPU Quicksort", hostQuicksort},
+  struct { const char* name; void (*sort)(int*, int); } benchmarks[] = {
+    {"CPU  Mergesort",           hostMergesort},
+    {"CPU  Quicksort (cstdlib)", hostQuicksortC},
+    {"CPU  Quicksort",           hostQuicksort},
+  /*{"CPU  Roughsort",           hostRoughsort},
+    {"CUDA Mergesort",           cudaMergesort},
+    {"CUDA Quicksort",           cudaQuicksort},
+    {"CUDA Roughsort",           cudaRoughsort},*/
   };
-  const int benchsLen = sizeof(benchs) / sizeof(*benchs);
+  const int benchmarksLen = sizeof(benchmarks) / sizeof(*benchmarks);
 
-  for (int i = 0; i < benchsLen; i++) {
+  for (int i = 0; i < benchmarksLen; i++) {
     memcpy(sortingArray, unsortedArray, arraySize);
     timespec start;
     getTime(&start);
-    benchs[i].sort(sortingArray, arrayLen);
-    msg("%25s took %d ms", benchs[i].name, msSince(&start));
+    benchmarks[i].sort(sortingArray, arrayLen);
+    msg("%25s took %d ms", benchmarks[i].name, msSince(&start));
   }
 
   delete[] unsortedArray;

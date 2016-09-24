@@ -45,15 +45,9 @@ int test0[]  = {},
     test19[] = {1, 8, 2, 4, 6, 7, 5, 9, 0, 3},
     test20[] = {1, 8, 8, 4, 2, 7, 5, 9, 0, 7};
 
-class Test {
-public:
-  int* a;
-  int n;
-};
-
 #define ALEN(a) (sizeof(a) / sizeof(*a))
 #define ATEST(a) {a, ALEN(a)}
-Test tests[] = {
+struct Test { int* a; int n; } tests[] = {
   ATEST(test0), ATEST(test1), ATEST(test2), ATEST(test3), ATEST(test4),
   ATEST(test5), ATEST(test6), ATEST(test7), ATEST(test8), ATEST(test9),
   ATEST(test10), ATEST(test11), ATEST(test12), ATEST(test13), ATEST(test14),

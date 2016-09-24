@@ -39,9 +39,10 @@ int median3(const int* const a, int* const pivot, const int n) {
   return k;
 }
 
-}
+} // end anonymous namespace
 
 void hostMergesort(int* const a, const int n) {
+  // TODO: replace this function with a closure over b to speed it up
   auto b = new int[n]; // don't allocate GiB on the stack
   mergesort(a, b, 0, n);
   delete[] b;
@@ -70,7 +71,7 @@ void hostQuicksort(int* const a, const int n) {
   auto i = 0;
   for (auto j = 0; j < r; j++) {
     auto x = a[j];
-    if (x <= pivot) {
+    if (x < pivot) {
       tmp = a[i];
       a[i] = x;
       a[j] = tmp;

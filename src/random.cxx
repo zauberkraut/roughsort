@@ -19,10 +19,12 @@ bool rdRandSupported() {
 }
 
 /* Uses RDRAND instruction to generate high-quality random integers.
+   Intended for use in the creation of k-sorted sequences for a given k.
    Requires an Ivy Bridge or newer x86 CPU. Requires no seeding. */
 int rdRand() {
   unsigned r;
   if (_rdrand32_step(&r)) {
+    // TODO: perhaps save the discarded bit in case we run out of entropy
     return (int)(r >> 1);
   }
   // I'm not sure how often this should happen...
@@ -32,10 +34,9 @@ int rdRand() {
 
 [[ noreturn ]] int nullRand() {
   fatal("randInt() was invoked before initialization!");
-  exit(-1);
 }
 
-}
+} // end anonymous namespace
 
 /* Either high-end RDRAND or lousy rand(). */
 int (*randInt)() = nullRand;
@@ -62,22 +63,22 @@ void randInit() {
    This PRNG shall generate every nonzero 32-bit integer exactly once before
    repeating. */
 int xorsh() {
-	auto x = state;
-	x ^= x << 5;
-	x ^= x >> 17;
-	x ^= x << 13;
-	state = x;
-	return (int)x;
+  auto x = state;
+  x ^= x << 5;
+  x ^= x >> 17;
+  x ^= x << 13;
+  state = x;
+  return (int)x;
 }
 
 /* 64-bit version of the above, just in case. */
 int xorsh64() {
-	auto x = state64;
-	x ^= x << 12;
-	x ^= x >> 7;
-	x ^= x << 13;
-	state64 = x;
-	return (int64_t)x;
+  auto x = state64;
+  x ^= x << 12;
+  x ^= x >> 7;
+  x ^= x << 13;
+  state64 = x;
+  return (int64_t)x;
 }
 
 /* Randomizes an integer array. */

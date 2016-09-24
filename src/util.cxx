@@ -12,7 +12,7 @@ void print(FILE* f, const char* s, va_list args) {
   va_end(args);
 }
 
-}
+} // end anonymous namespace
 
 /* I hate having to fill in trailing newlines. */
 void msg(const char* s, ...) {
@@ -25,7 +25,7 @@ void warn(const char* s, ...) {
   print(stderr, s, args);
 }
 
-void fatal(const char* s, ...) {
+[[ noreturn ]] void fatal(const char* s, ...) {
   fprintf(stderr, "FATAL: ");
   va_list args; va_start(args, s);
   print(stderr, s, args);

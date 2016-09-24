@@ -22,7 +22,7 @@ void cudaRoughsort(int* const a, const int n);
 
 void msg(const char* s, ...);
 void warn(const char* s, ...);
-void fatal(const char* s, ...);
+[[ noreturn ]] void fatal(const char* s, ...);
 double mibibytes(size_t size);
 
 size_t cuMemAvail();
