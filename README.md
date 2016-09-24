@@ -22,3 +22,8 @@ To run unit tests:
 
 For usage instructions, run (after building):  
 `roughsort`
+
+To sort a randomly-generated array of 20000 integers, run:  
+`roughsort -c -n 20000`
+
+No CUDA kernels are implemented yet, so the binary must be run with the '-c' flag to disable GPU computation.

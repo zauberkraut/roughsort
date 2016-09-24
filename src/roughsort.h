@@ -9,15 +9,16 @@ inline int randIntN(int m) { return randInt() % m; }
 void randInit();
 int xorsh();
 int xorsh64();
+void randArray(int* const a, const int n);
 
-void hostMergesort(int* a, const int n);
-void hostQuicksort(int* a, const int n);
-void hostQuicksortC(int* a, const int n);
-void hostRoughSort(int* a, const int n);
+void hostMergesort(int* const a, const int n);
+void hostQuicksort(int* const a, const int n);
+void hostQuicksortC(int* const a, const int n);
+void hostRoughSort(int* const a, const int n);
 
-void cudaMergesort(int* a, const int n);
-void cudaQuicksort(int* a, const int n);
-void cudaRoughsort(int* a, const int n);
+void cudaMergesort(int* const a, const int n);
+void cudaQuicksort(int* const a, const int n);
+void cudaRoughsort(int* const a, const int n);
 
 void msg(const char* s, ...);
 void warn(const char* s, ...);

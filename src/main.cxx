@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <unistd.h>
 #include "roughsort.h"
 
@@ -32,6 +33,23 @@ int parseInt(int radix, int min, int max, const char* errMsg) {
   }
   return i;
 }
+
+void getTime(timespec* start) {
+  clock_gettime(CLOCK_MONOTONIC, start);
+}
+
+int msSince(timespec* start) {
+  timespec time;
+  getTime(&time);
+  return (time.tv_sec - start->tv_sec)*1000 +
+         (time.tv_nsec - start->tv_nsec)/1.e6;
+}
+
+class Benchmark {
+public:
+  const char* name;
+  void (*sort)(int*, int);
+};
 
 [[ noreturn ]] void usage() {
   msg("roughsort [options]\n"
@@ -89,6 +107,27 @@ int main(int argc, char* argv[]) {
   randInit();
 
   msg("generating a random array of %d integers...", arrayLen);
+  auto unsortedArray = new int[arrayLen],
+       sortingArray  = new int[arrayLen];
+  const auto arraySize = sizeof(*unsortedArray) * arrayLen;
+  randArray(unsortedArray, arrayLen);
 
+  Benchmark benchs[] = {
+    {"CPU Mergesort", hostMergesort},
+    {"CPU Quicksort (cstdlib)", hostQuicksortC},
+    {"CPU Quicksort", hostQuicksort},
+  };
+  const int benchsLen = sizeof(benchs) / sizeof(*benchs);
+
+  for (int i = 0; i < benchsLen; i++) {
+    memcpy(sortingArray, unsortedArray, arraySize);
+    timespec start;
+    getTime(&start);
+    benchs[i].sort(sortingArray, arrayLen);
+    msg("%25s took %d ms", benchs[i].name, msSince(&start));
+  }
+
+  delete[] unsortedArray;
+  delete[] sortingArray;
   return 0;
 }

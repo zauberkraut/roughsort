@@ -1,5 +1,6 @@
 /* test.cxx: unit tests */
 
+#include <climits>
 #include <csetjmp>
 #include <cstdarg>
 #include <cstddef>
@@ -20,13 +21,6 @@ enum {
 int randLen() {
   return randIntN(MAX_RAND_ARRAY_LEN - MIN_RAND_ARRAY_LEN + 1) +
          MIN_RAND_ARRAY_LEN;
-}
-
-/* Randomizes an integer array. */
-void randArray(int* const a, const int n) {
-  for (int i = 0; i < n; i++) {
-    a[i] = randInt();
-  }
 }
 
 int test0[]  = {},
@@ -83,9 +77,9 @@ void runTest(void** state, void (*sort)(int*, int)) {
 
     sort(a, test.n);
 
-    int prev = 0;
-    for (int i = 0; i < test.n; i++) {
-      auto x = a[i];
+    int prev = INT_MIN;
+    for (int j = 0; j < test.n; j++) {
+      auto x = a[j];
       assert_true(prev <= x);
       prev = x;
     }

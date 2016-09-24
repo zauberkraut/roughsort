@@ -41,33 +41,35 @@ int median3(const int* const a, int* const pivot, const int n) {
 
 }
 
-void hostMergesort(int* a, const int n) {
+void hostMergesort(int* const a, const int n) {
   auto b = new int[n]; // don't allocate GiB on the stack
   mergesort(a, b, 0, n);
   delete[] b;
 }
 
-void hostQuicksortC(int* a, const int n) {
+void hostQuicksortC(int* const a, const int n) {
   qsort(a, n, sizeof(int),
         [](const void* x, const void* y) { return *(int*)x - *(int*)y; });
 }
 
-void hostQuicksort(int* a, const int n) {
+/* For comparison with the indirection of cstdlib:qsort().
+   Currently performs terribly over already-sorted arrays. */
+void hostQuicksort(int* const a, const int n) {
   if (n < 2) {
     return;
   }
 
   int pivot;
-  int k = median3(a, &pivot, n); // k = pivot index in a
-  int r = n - 1;
+  const auto k = median3(a, &pivot, n); // k = pivot index in a
+  const auto r = n - 1;
 
-  int tmp = a[k];
+  auto tmp = a[k];
   a[k] = a[r];
   a[r] = tmp;
 
-  int i = 0;
-  for (int j = 0; j < r; j++) {
-    int x = a[j];
+  auto i = 0;
+  for (auto j = 0; j < r; j++) {
+    auto x = a[j];
     if (x <= pivot) {
       tmp = a[i];
       a[i] = x;

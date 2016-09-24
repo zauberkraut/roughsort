@@ -79,3 +79,10 @@ int xorsh64() {
 	state64 = x;
 	return (int64_t)x;
 }
+
+/* Randomizes an integer array. */
+void randArray(int* const a, const int n) {
+  for (int i = 0; i < n; i++) {
+    a[i] = randInt();
+  }
+}
