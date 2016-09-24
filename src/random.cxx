@@ -61,7 +61,7 @@ void randInit() {
 
 /* High-end and high-speed PRNG over a group structure.
    This PRNG shall generate every nonzero 32-bit integer exactly once before
-   repeating. */
+   repeating and is meant to produce sequences without repeated elements. */
 int xorsh() {
   auto x = state;
   x ^= x << 5;
@@ -84,6 +84,6 @@ int xorsh64() {
 /* Randomizes an integer array. */
 void randArray(int* const a, const int n) {
   for (int i = 0; i < n; i++) {
-    a[i] = randInt();
+    a[i] = xorsh();
   }
 }

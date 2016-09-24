@@ -50,7 +50,10 @@ void hostMergesort(int* const a, const int n) {
 
 void hostQuicksortC(int* const a, const int n) {
   qsort(a, n, sizeof(int),
-        [](const void* x, const void* y) { return *(int*)x - *(int*)y; });
+        [](const void* x, const void* y) {
+          // x - y can cause signed int overflow, whose behavior is undefined
+          return *(int*)x < *(int*)y ? -1 : (*(int*)x > *(int*)y ? 1 : 0);
+        });
 }
 
 /* For comparison with the indirection of cstdlib:qsort().
