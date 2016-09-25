@@ -11,7 +11,7 @@ int xorsh();
 int xorsh64();
 void randArray(int* const a, const int n);
 
-void hostMergesort(int* const a, const int n);
+void hostMergesort(int* const a, int* const b, const int n);
 void hostQuicksort(int* const a, const int n);
 void hostQuicksortC(int* const a, const int n);
 void hostRoughSort(int* const a, const int n);

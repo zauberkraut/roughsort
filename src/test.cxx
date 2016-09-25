@@ -58,6 +58,7 @@ const int testCount = ALEN(tests) + 1;
 
 void runTest(void** state, void (*sort)(int*, int)) {
   static int a[MAX_RAND_ARRAY_LEN];
+  static int expected[MAX_RAND_ARRAY_LEN];
 
   for (int i = 0; i < testCount; i++) {
     auto randTest = i == testCount - 1;
@@ -69,13 +70,14 @@ void runTest(void** state, void (*sort)(int*, int)) {
       memcpy(a, test.a, sizeof(*test.a) * test.n);
     }
 
+    // perform reference sorting for comparison
+    memcpy(expected, a, sizeof(*a) * test.n);
+    hostQuicksortC(expected, test.n);
+
     sort(a, test.n);
 
-    int prev = INT_MIN;
     for (int j = 0; j < test.n; j++) {
-      auto x = a[j];
-      assert_true(prev <= x);
-      prev = x;
+      assert_int_equal(a[j], expected[j]);
     }
   }
 }
@@ -120,13 +122,18 @@ void testCudaKernel(void** state) {
   cuFree(devA);
 }
 
-void testHostMergesort(void** state) { runTest(state, hostMergesort); }
+void hostMergesortWrap(int* const a, const int n) {
+  static int mergesortBuffer[MAX_RAND_ARRAY_LEN];
+  hostMergesort(a, mergesortBuffer, n);
+}
+
+void testHostMergesort(void** state)  { runTest(state, hostMergesortWrap); }
 void testHostQuicksortC(void** state) { runTest(state, hostQuicksortC); }
-void testHostQuicksort(void** state) { runTest(state, hostQuicksort); }
-void testHostRoughsort(void** state) {}
-void testCudaMergesort(void** state) {}
-void testCudaQuicksort(void** state) {}
-void testCudaRoughsort(void** state) {}
+void testHostQuicksort(void** state)  { runTest(state, hostQuicksort); }
+void testHostRoughsort(void** state)  {}
+void testCudaMergesort(void** state)  {}
+void testCudaQuicksort(void** state)  {}
+void testCudaRoughsort(void** state)  {}
 
 /* Ensure that this PRNG never emits the same term twice within one period.
    This test might take a few minutes to run. */
