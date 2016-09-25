@@ -4,8 +4,8 @@ Parallel CUDA sorter of k-sorted sequences.
 ---
 
 Dependencies:
-  * CUDA SDK 8.0
-  * GCC
+  * CUDA SDK 8.0+
+  * GCC 4.6+
   * GNU Make
   * CMocka for unit tests
 
