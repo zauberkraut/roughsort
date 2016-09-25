@@ -33,6 +33,7 @@ void cuUpload(void* devDst, const void* hostSrc, size_t size);
 void cuDownload(void* hostDst, const void* devSrc, size_t size);
 void cuPin(void* p, size_t size);
 void cuUnpin(void* p);
+
 void cuSquare(int* a, int n);
 
 #endif

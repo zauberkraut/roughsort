@@ -1,3 +1,5 @@
+/* sort.cxx: Sequential pure-CPU sorting routines. */
+
 #include <cstdlib>
 #include <cstring>
 #include "roughsort.h"

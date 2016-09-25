@@ -1,4 +1,4 @@
-/* random.cxx: k-sorted random sequence generator */
+/* random.cxx: (P)RNGs and random sequence generator. */
 
 #include <climits>
 #include <cpuid.h>

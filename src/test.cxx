@@ -1,4 +1,4 @@
-/* test.cxx: unit tests */
+/* test.cxx: Unit tests. */
 
 #include <climits>
 #include <csetjmp>
