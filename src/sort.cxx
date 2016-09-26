@@ -13,29 +13,26 @@ inline void swap(int32_t* const a, const int i, const int j) {
   a[j] = l;
 }
 
-void mergesort(int32_t* const a, int32_t* const b, const int i, const int n,
+void mergesort(int32_t* const a, int32_t* const b, const int n,
                const int depth) {
-  const int llen = n / 2,
-            rlen = n - llen,
-            mid  = i + llen;
+  const int llen = n / 2, rlen = n - llen;
 
   if (depth) {
     if (llen > 1) {
-      mergesort(b, a, i, llen, depth - 1);
+      mergesort(b, a, llen, depth - 1);
     }
     if (rlen > 1) {
-      mergesort(b, a, mid, rlen, depth - 1);
+      mergesort(b + llen, a + llen, rlen, depth - 1);
     }
   }
 
   if (!depth) {
-    if (a[i] > a[mid]) { // swap src pairs in place
-      swap(a, i, mid);
+    if (a[0] > a[1]) { // swap src pairs in place
+      swap(a, 0, 1);
     }
   } else { // merge
-    const int end = i + n;
-    for (int l = i, r = mid, k = l; k < end; k++) {
-      auto x = (r == end || (l != mid && b[l] <= b[r])) ? b[l++] : b[r++];
+    for (int l = 0, r = llen, k = l; k < n; k++) {
+      auto x = (r == n || (l != llen && b[l] <= b[r])) ? b[l++] : b[r++];
       a[k] = x;
     }
   }
@@ -74,7 +71,7 @@ void hostMergesort(int32_t* const a, int32_t* const b, const int n) {
   if (n > 1) {
     auto depth = (int)floor(log2(n));
     bool sortToB = depth & 1;
-    mergesort(sortToB ? b : a, sortToB ? a : b, 0, n, depth);
+    mergesort(sortToB ? b : a, sortToB ? a : b, n, depth);
     if (sortToB) { // sort back to a
       memcpy(a, b, sizeof(*a) * n);
     }
