@@ -26,7 +26,7 @@ For usage instructions, run (after building):
 To sort a randomly-generated array of 20000 integers, run:  
 `roughsort -n 20000`
 
-To compare the sorting results to a reference implementation, add the -t flag:
+To compare the sorting results to a reference implementation, add the -t flag:  
 `roughsort -tn 20000`
 
 No CUDA kernels are implemented yet.
