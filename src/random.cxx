@@ -21,25 +21,25 @@ bool rdRandSupported() {
 /* Uses RDRAND instruction to generate high-quality random integers.
    Intended for use in the creation of k-sorted sequences for a given k.
    Requires an Ivy Bridge or newer x86 CPU. Requires no seeding. */
-int rdRand() {
+int32_t rdRand() {
   unsigned r;
   if (_rdrand32_step(&r)) {
     // TODO: perhaps save the discarded bit in case we run out of entropy
-    return (int)(r >> 1);
+    return (int32_t)(r >> 1);
   }
   // I'm not sure how often this should happen...
   warn("RDRAND ran out of entropy; sourcing from rand()");
-  return (int)r ^ rand();
+  return (int32_t)(r ^ rand());
 }
 
-[[ noreturn ]] int nullRand() {
+[[ noreturn ]] int32_t nullRand() {
   fatal("randInt() was invoked before initialization!");
 }
 
 } // end anonymous namespace
 
 /* Either high-end RDRAND or lousy rand(). */
-int (*randInt)() = nullRand;
+int32_t (*randInt)() = nullRand;
 
 /* Selects general-purpose RNG and seeds xorshift (and rand() if there's no
    RDRAND support). */
@@ -62,17 +62,17 @@ void randInit() {
 /* High-end and high-speed PRNG over a group structure.
    This PRNG shall generate every nonzero 32-bit integer exactly once before
    repeating and is meant to produce sequences without repeated elements. */
-int xorsh() {
+int32_t xorsh() {
   auto x = state;
   x ^= x << 5;
   x ^= x >> 17;
   x ^= x << 13;
   state = x;
-  return (int)x;
+  return (int32_t)x;
 }
 
 /* 64-bit version of the above, just in case. */
-int xorsh64() {
+int64_t xorsh64() {
   auto x = state64;
   x ^= x << 12;
   x ^= x >> 7;
@@ -82,7 +82,7 @@ int xorsh64() {
 }
 
 /* Randomizes an integer array. */
-void randArray(int* const a, const int n) {
+void randArray(int32_t* const a, const int n) {
   for (int i = 0; i < n; i++) {
     a[i] = xorsh();
   }

@@ -48,14 +48,14 @@ int msSince(timespec* start) {
 [[ noreturn ]] void usage() {
   msg("roughsort [options]\n"
       "  -h        These instructions\n"
-      "  -c        Perform all sorting on host without the GPU\n"
+      "  -g        Skip the sequential, non-GPU algorithms\n"
       "  -n <len>  Specify random unsorted array length (default: %d)\n"
       "  -t        Confirm sorted array is in order\n",
       DEFAULT_ARRAY_LEN);
   exit(1);
 }
 
-bool testArrayEq(const int* const a, const int* const b, const int n) {
+bool testArrayEq(const int32_t* const a, const int32_t* const b, const int n) {
   for (int i = 0; i < n; i++) {
     if (a[i] != b[i]) {
       return false;
@@ -64,26 +64,27 @@ bool testArrayEq(const int* const a, const int* const b, const int n) {
   return true;
 }
 
-int* g_mergesortBuffer;
+int32_t* g_mergesortBuffer;
 } // end anonymous namespace
 
 int main(int argc, char* argv[]) {
   msg("Roughsort Demonstration\nA. Pfaff, J. Treadwell 2016\n");
 
-  bool useGPU = true;
+  bool runHostSorts = true;
+  const bool runDevSorts = false; // TODO
   bool testSorted = false;
   int arrayLen = DEFAULT_ARRAY_LEN;
 
   int option;
-  while ((option = getopt(argc, argv, "hcn:t")) != -1) {
+  while ((option = getopt(argc, argv, "hgn:t")) != -1) {
     switch (option) {
       char cbuf[21];
 
     case 'h':
       usage();
       break;
-    case 'c':
-      useGPU = false;
+    case 'g':
+      runHostSorts = false;
       break;
     case 't':
       testSorted = true;
@@ -109,54 +110,57 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (useGPU) {
-    fatal("work in progress");
-  }
-
   randInit();
 
   msg("allocating storage...", arrayLen);
-  auto unsortedArray   = new int[arrayLen],
-       sortingArray    = new int[arrayLen],
-       referenceArray  = testSorted ? new int[arrayLen] : nullptr;
-  g_mergesortBuffer = new int[arrayLen];
+  auto unsortedArray   = new int32_t[arrayLen],
+       sortingArray    = new int32_t[arrayLen],
+       referenceArray  = testSorted ? new int32_t[arrayLen] : nullptr;
+  g_mergesortBuffer = new int32_t[arrayLen];
+
   const auto arraySize = sizeof(*unsortedArray) * arrayLen;
   msg("generating a random array of %d integers...", arrayLen);
   randArray(unsortedArray, arrayLen);
 
-  if (referenceArray) {
+  if (testSorted) {
     msg("sorting reference array for comparison later...");
     memcpy(referenceArray, unsortedArray, arraySize);
-    hostQuicksortC(referenceArray, arrayLen);
+    timespec start;
+    getTime(&start);
+    referenceSort(referenceArray, arrayLen);
+    msg("%15s took %d ms", "cstdlib qsort()", msSince(&start));
   }
 
-  auto hostMergesortWrap = [](int* const a, const int n) {
+  auto hostMergesortWrap = [](int32_t* const a, const int n) {
     hostMergesort(a, g_mergesortBuffer, n);
   };
 
   struct {
     const char* name;
-    void (*sort)(int* const, const int);
+    void (*sort)(int32_t* const, const int);
+    bool runTest;
   } benchmarks[] = {
-    {"CPU  Mergesort",           hostMergesortWrap},
-    {"CPU  Quicksort (cstdlib)", hostQuicksortC},
-    {"CPU  Quicksort",           hostQuicksort},
-  /*{"CPU  Roughsort",           hostRoughsort},
-    {"CUDA Mergesort",           cudaMergesort},
-    {"CUDA Quicksort",           cudaQuicksort},
-    {"CUDA Roughsort",           cudaRoughsort},*/
+    {"CPU Mergesort",  hostMergesortWrap, runHostSorts},
+    {"CPU Quicksort",  hostQuicksort,     runHostSorts},
+    {"CPU Roughsort",  hostRoughsort,     false && runHostSorts},
+    {"GPU Mergesort",  devMergesort,      runDevSorts},
+    {"GPU Roughsort",  devRoughsort,      runDevSorts}
   };
   const int benchmarksLen = sizeof(benchmarks) / sizeof(*benchmarks);
 
+  msg("running sort algorithm benchmarks...");
+
   for (int i = 0; i < benchmarksLen; i++) {
-    memcpy(sortingArray, unsortedArray, arraySize);
-    timespec start;
-    getTime(&start);
-    benchmarks[i].sort(sortingArray, arrayLen);
-    auto ms = msSince(&start);
-    msg("%25s took %d ms%s", benchmarks[i].name, ms,
-        testSorted && !testArrayEq(sortingArray, referenceArray, arrayLen) ?
-          " BUT IS BROKEN" : "");
+    if (benchmarks[i].runTest) {
+      memcpy(sortingArray, unsortedArray, arraySize);
+      timespec start;
+      getTime(&start);
+      benchmarks[i].sort(sortingArray, arrayLen);
+      auto ms = msSince(&start);
+      msg("%15s took %d ms%s", benchmarks[i].name, ms,
+          testSorted && !testArrayEq(sortingArray, referenceArray, arrayLen) ?
+            " BUT IS BROKEN" : "");
+    }
   }
 
   delete[] unsortedArray;

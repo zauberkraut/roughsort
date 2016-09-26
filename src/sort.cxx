@@ -7,13 +7,13 @@
 
 namespace {
 
-inline void swap(int* const a, const int i, const int j) {
+inline void swap(int32_t* const a, const int i, const int j) {
   const int l = a[i], r = a[j];
   a[i] = r;
   a[j] = l;
 }
 
-void mergesort(int* const a, int* const b, const int i, const int n,
+void mergesort(int32_t* const a, int32_t* const b, const int i, const int n,
                const int depth) {
   const int llen = n / 2,
             rlen = n - llen,
@@ -35,16 +35,16 @@ void mergesort(int* const a, int* const b, const int i, const int n,
   } else { // merge
     const int end = i + n;
     for (int l = i, r = mid, k = l; k < end; k++) {
-      int x = (r == end || (l != mid && b[l] <= b[r])) ? b[l++] : b[r++];
+      auto x = (r == end || (l != mid && b[l] <= b[r])) ? b[l++] : b[r++];
       a[k] = x;
     }
   }
 }
 
 /* Selects the median of the first, middle and last elements of the array. */
-int median3(const int* const a, int* const pivot, const int n) {
+int median3(const int32_t* const a, int32_t* const pivot, const int n) {
   int i = n/2, j = n-1, k;
-  int lo = a[0], mid = a[i], hi = a[j];
+  auto lo = a[0], mid = a[i], hi = a[j];
 
   if (mid <= lo && lo <= hi) {
     k = 0; *pivot = lo;
@@ -59,8 +59,18 @@ int median3(const int* const a, int* const pivot, const int n) {
 
 } // end anonymous namespace
 
-/* Mergesort launcher */
-void hostMergesort(int* const a, int* const b, const int n) {
+/* qsort() from cstdlib, used for reference. */
+void referenceSort(int32_t* const a, const int n) {
+  qsort(a, n, sizeof(int32_t),
+        [](const void* x, const void* y) {
+          // x - y can cause signed int overflow, whose behavior is undefined
+          return *(int32_t*)x < *(int32_t*)y ? -1 :
+                 (*(int32_t*)x > *(int32_t*)y ? 1 : 0);
+        });
+}
+
+/* Linear-space mergesort. */
+void hostMergesort(int32_t* const a, int32_t* const b, const int n) {
   if (n > 1) {
     auto depth = (int)floor(log2(n));
     bool sortToB = depth & 1;
@@ -71,18 +81,8 @@ void hostMergesort(int* const a, int* const b, const int n) {
   }
 }
 
-/* Quicksort from cstdlib. */
-void hostQuicksortC(int* const a, const int n) {
-  qsort(a, n, sizeof(int),
-        [](const void* x, const void* y) {
-          // x - y can cause signed int overflow, whose behavior is undefined
-          return *(int*)x < *(int*)y ? -1 : (*(int*)x > *(int*)y ? 1 : 0);
-        });
-}
-
-/* For comparison with the indirection of cstdlib:qsort().
-   Currently performs terribly over already-sorted arrays. */
-void hostQuicksort(int* const a, const int n) {
+/* A somewhat-lousy quicksort implementation. */
+void hostQuicksort(int32_t* const a, const int n) {
   if (n < 2) {
     return;
   }
@@ -104,4 +104,8 @@ void hostQuicksort(int* const a, const int n) {
 
   hostQuicksort(a, i);
   hostQuicksort(a + i + 1, n - i - 1);
+}
+
+/* Sequential roughsort implementation. */
+void hostRoughsort(int32_t* const a, const int n) {
 }

@@ -23,31 +23,32 @@ int randLen() {
          MIN_RAND_ARRAY_LEN;
 }
 
-int test0[]  = {},
-    test1[]  = {0},
-    test2[]  = {0, 0},
-    test3[]  = {0, 1},
-    test4[]  = {1, 0},
-    test5[]  = {0, 0, 0},
-    test6[]  = {0, 0, 1},
-    test7[]  = {0, 1, 0},
-    test8[]  = {0, 1, 1},
-    test9[]  = {1, 0, 0},
-    test10[] = {1, 0, 1},
-    test11[] = {1, 1, 0},
-    test12[] = {1, 1, 1},
-    test13[] = {0, 1, 2},
-    test14[] = {0, 2, 1},
-    test15[] = {1, 0, 2},
-    test16[] = {1, 2, 0},
-    test17[] = {2, 1, 0},
-    test18[] = {2, 0, 1},
-    test19[] = {1, 8, 2, 4, 6, 7, 5, 9, 0, 3},
-    test20[] = {1, 8, 8, 4, 2, 7, 5, 9, 0, 7};
+int32_t test0[]  = {},
+        test1[]  = {0},
+        test2[]  = {0, 0},
+        test3[]  = {0, 1},
+        test4[]  = {1, 0},
+        test5[]  = {0, 0, 0},
+        test6[]  = {0, 0, 1},
+        test7[]  = {0, 1, 0},
+        test8[]  = {0, 1, 1},
+        test9[]  = {1, 0, 0},
+        test10[] = {1, 0, 1},
+        test11[] = {1, 1, 0},
+        test12[] = {1, 1, 1},
+        test13[] = {0, 1, 2},
+        test14[] = {0, 2, 1},
+        test15[] = {1, 0, 2},
+        test16[] = {1, 2, 0},
+        test17[] = {2, 1, 0},
+        test18[] = {2, 0, 1},
+        test19[] = {1, 8, 2, 4, 6, 7, 5, 9, 0, 3},
+        test20[] = {1, 8, 8, 4, 2, 7, 5, 9, 0, 7},
+        test19sorted[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
 #define ALEN(a) (sizeof(a) / sizeof(*a))
 #define ATEST(a) {a, ALEN(a)}
-struct Test { int* a; int n; } tests[] = {
+struct Test { int32_t* a; const int n; } tests[] = {
   ATEST(test0), ATEST(test1), ATEST(test2), ATEST(test3), ATEST(test4),
   ATEST(test5), ATEST(test6), ATEST(test7), ATEST(test8), ATEST(test9),
   ATEST(test10), ATEST(test11), ATEST(test12), ATEST(test13), ATEST(test14),
@@ -56,9 +57,9 @@ struct Test { int* a; int n; } tests[] = {
 };
 const int testCount = ALEN(tests) + 1;
 
-void runTest(void** state, void (*sort)(int*, int)) {
-  static int a[MAX_RAND_ARRAY_LEN];
-  static int expected[MAX_RAND_ARRAY_LEN];
+void runTest(void** state, void (*sort)(int32_t* const, const int)) {
+  static int32_t a[MAX_RAND_ARRAY_LEN];
+  static int32_t expected[MAX_RAND_ARRAY_LEN];
 
   for (int i = 0; i < testCount; i++) {
     auto randTest = i == testCount - 1;
@@ -72,7 +73,7 @@ void runTest(void** state, void (*sort)(int*, int)) {
 
     // perform reference sorting for comparison
     memcpy(expected, a, sizeof(*a) * test.n);
-    hostQuicksortC(expected, test.n);
+    referenceSort(expected, test.n);
 
     sort(a, test.n);
 
@@ -82,19 +83,19 @@ void runTest(void** state, void (*sort)(int*, int)) {
   }
 }
 
-void testCudaMemory(void** state) {
+void testDevMemory(void** state) {
   const int n = randLen();
-  const size_t size = sizeof(int) * n;
-  int* devA = (int*)cuMalloc(size);
+  const size_t size = sizeof(int32_t) * n;
+  int32_t* devA = (int32_t*)cuMalloc(size);
   cuClear(devA, size);
 
-  auto a = new int[n];
+  auto a = new int32_t[n];
   cuDownload(a, devA, size);
   for (int i = 0; i < n; i++) {
     assert_false(a[i]);
   }
 
-  auto b = new int[n];
+  auto b = new int32_t[n];
   randArray(a, n);
   cuUpload(devA, a, size);
   cuDownload(b, devA, size);
@@ -107,12 +108,12 @@ void testCudaMemory(void** state) {
   delete[] b;
 }
 
-void testCudaKernel(void** state) {
-  int a[] = {1, 2, 3}, expected[] = {1, 4, 9};
+void testDevKernel(void** state) {
+  int32_t a[] = {1, 2, 3}, expected[] = {1, 4, 9};
   const int n = sizeof(a) / sizeof(*a);
-  int* devA = (int*)cuMalloc(sizeof(a));
+  int32_t* devA = (int32_t*)cuMalloc(sizeof(a));
   cuUpload(devA, a, sizeof(a));
-  cuSquare(devA, n);
+  devSquare(devA, n);
   cuDownload(a, devA, sizeof(a));
 
   for (int i = 0; i < n; i++) {
@@ -122,18 +123,26 @@ void testCudaKernel(void** state) {
   cuFree(devA);
 }
 
-void hostMergesortWrap(int* const a, const int n) {
-  static int mergesortBuffer[MAX_RAND_ARRAY_LEN];
+void testReferenceSort(void** state) {
+  const int n = sizeof(test19)/sizeof(*test19);
+  int32_t a[n];
+  memcpy(a, test19, sizeof(test19));
+  referenceSort(a, n);
+  for (int i = 0; i < n; i++) {
+    assert_int_equal(a[i], test19sorted[i]);
+  }
+}
+
+void hostMergesortWrap(int32_t* const a, const int n) {
+  static int32_t mergesortBuffer[MAX_RAND_ARRAY_LEN];
   hostMergesort(a, mergesortBuffer, n);
 }
 
 void testHostMergesort(void** state)  { runTest(state, hostMergesortWrap); }
-void testHostQuicksortC(void** state) { runTest(state, hostQuicksortC); }
 void testHostQuicksort(void** state)  { runTest(state, hostQuicksort); }
 void testHostRoughsort(void** state)  {}
-void testCudaMergesort(void** state)  {}
-void testCudaQuicksort(void** state)  {}
-void testCudaRoughsort(void** state)  {}
+void testDevMergesort(void** state)   {}
+void testDevRoughsort(void** state)   {}
 
 /* Ensure that this PRNG never emits the same term twice within one period.
    This test might take a few minutes to run. */
@@ -158,15 +167,14 @@ int main() {
   randInit();
 
   const struct CMUnitTest tests[] = {
-    cmocka_unit_test(testCudaMemory),
-    cmocka_unit_test(testCudaKernel),
+    cmocka_unit_test(testReferenceSort),
+    cmocka_unit_test(testDevMemory),
+    cmocka_unit_test(testDevKernel),
     cmocka_unit_test(testHostMergesort),
-    cmocka_unit_test(testHostQuicksortC),
     cmocka_unit_test(testHostQuicksort),
     cmocka_unit_test(testHostRoughsort),
-    cmocka_unit_test(testCudaMergesort),
-    cmocka_unit_test(testCudaQuicksort),
-    cmocka_unit_test(testCudaRoughsort),
+    cmocka_unit_test(testDevMergesort),
+    cmocka_unit_test(testDevRoughsort),
     cmocka_unit_test(testXorshift),
   };
 
