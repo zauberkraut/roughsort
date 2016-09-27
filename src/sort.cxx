@@ -73,15 +73,13 @@ void hostMergesort(int32_t* const a, int32_t* const b, const int n) {
   }
 }
 
-/* Linear-space bottom-up mergesort. */
+/* Linear-space, partially-optimized bottom-up mergesort. */
 void hostMergesortUp(int32_t* const a, int32_t* const b, const int n) {
   int32_t *src = a, *dst = b;
 
   for (int runLen = 1; runLen < n; runLen <<= 1) {
-    const int mergeCount = (n + runLen - 1) / runLen >> 1;
-
-    for (int merge = 0; merge < mergeCount; merge++) {
-      int l = (merge << 1) * runLen, r = l + runLen;
+    int l = 0;
+    for (int r = runLen; r < n; l = r, r += runLen) {
       const int lend = r, rend = r + runLen < n ? r + runLen : n;
 
       for (int k = l; k < rend; k++) {
@@ -91,9 +89,8 @@ void hostMergesortUp(int32_t* const a, int32_t* const b, const int n) {
       }
     }
 
-    const int tail = (runLen << 1) * mergeCount;
-    if (tail < n) {
-      memcpy(dst + tail, src + tail, sizeof(int32_t) * (n - tail));
+    if (l < n) {
+      memcpy(dst + l, src + l, sizeof(int32_t) * (n - l));
     }
 
     int32_t* tmp = src;

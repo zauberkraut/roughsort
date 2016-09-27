@@ -1,8 +1,6 @@
 /* main.cxx */
 
-#include <cctype>
 #include <cerrno>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -11,7 +9,7 @@
 
 // for dealing with getopt arguments
 extern char *optarg;
-extern int optopt;
+extern int optind;
 
 namespace {
 
@@ -79,11 +77,9 @@ int main(int argc, char* argv[]) {
   int option;
   while ((option = getopt(argc, argv, "hgn:t")) != -1) {
     switch (option) {
-      char cbuf[21];
-
     case 'h':
       usage();
-      break;
+
     case 'g':
       runHostSorts = false;
       break;
@@ -96,19 +92,12 @@ int main(int argc, char* argv[]) {
       break;
 
     case '?': // deal with ill-formed parameterless option
-      switch (optopt) {
-      case 'n':
-        fatal("option -%c missing argument", optopt);
-      }
-      // fallthrough
-    default: // report invalid option character
-      if (isprint(optopt)) {
-        snprintf(cbuf, sizeof(cbuf), "%c", optopt);
-      } else {
-        snprintf(cbuf, sizeof(cbuf), "<0x%x>", optopt);
-      }
-      fatal("invalid option: -%s", cbuf);
+    default:  // ...or invalid option
+      usage();
     }
+  }
+  if (optind < argc) { // reject extra arguments
+    fatal("unexpected argument: %s", argv[optind]);
   }
 
   msg("allocating storage...", arrayLen);
