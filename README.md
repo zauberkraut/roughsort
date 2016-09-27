@@ -23,6 +23,9 @@ To run unit tests:
 For usage instructions, run (after building):  
 `roughsort -h`
 
+To sort a randomly-generated array of random length, run:  
+`roughsort`
+
 To sort a randomly-generated array of 20000 integers, run:  
 `roughsort -n 20000`
 

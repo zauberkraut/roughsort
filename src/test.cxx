@@ -4,6 +4,7 @@
 #include <csetjmp>
 #include <cstdarg>
 #include <cstddef>
+#include <cstdio>
 extern "C" {
 #include <cmocka.h>
 }
@@ -12,17 +13,7 @@ extern "C" {
 
 namespace {
 
-enum {
-  MIN_RAND_ARRAY_LEN = 1 << 10,
-  MAX_RAND_ARRAY_LEN = 1 << 20
-};
-
-/* Random length for an unsorted array. */
-int randLen() {
-  return randIntN(MAX_RAND_ARRAY_LEN - MIN_RAND_ARRAY_LEN + 1) +
-         MIN_RAND_ARRAY_LEN;
-}
-
+enum { MAX_TEST_LEN = 64 }; // UPDATE IF A LONGER TEST IS ADDED
 int32_t test0[]  = {},
         test1[]  = {0},
         test2[]  = {0, 0},
@@ -55,36 +46,45 @@ struct Test { int32_t* a; const int n; } tests[] = {
   ATEST(test15), ATEST(test16), ATEST(test17), ATEST(test18), ATEST(test19),
   ATEST(test20),
 };
-const int testCount = ALEN(tests) + 1;
+const int testCount = ALEN(tests);
+
+void printArray(const int* const a, const int n) {
+  printf("{ ");
+  for (int i = 0; i < n; i++) {
+    printf("%d ", a[i]);
+  }
+  printf("}");
+}
 
 void runTest(void** state, void (*sort)(int32_t* const, const int)) {
-  static int32_t a[MAX_RAND_ARRAY_LEN];
-  static int32_t expected[MAX_RAND_ARRAY_LEN];
+  static int32_t a[MAX_TEST_LEN];
+  static int32_t expected[MAX_TEST_LEN];
 
   for (int i = 0; i < testCount; i++) {
-    auto randTest = i == testCount - 1;
-    auto test = randTest ? Test{0, randLen()} : tests[i];
-
-    if (randTest) {
-      randArray(a, test.n);
-    } else {
-      memcpy(a, test.a, sizeof(*test.a) * test.n);
-    }
+    const auto n = tests[i].n;
+    memcpy(a, tests[i].a, sizeof(*a) * n);
 
     // perform reference sorting for comparison
-    memcpy(expected, a, sizeof(*a) * test.n);
-    referenceSort(expected, test.n);
+    memcpy(expected, a, sizeof(*a) * n);
+    referenceSort(expected, n);
 
-    sort(a, test.n);
+    sort(a, n);
 
-    for (int j = 0; j < test.n; j++) {
-      assert_int_equal(a[j], expected[j]);
+    for (int j = 0; j < n; j++) {
+      if (a[j] != expected[j]) {
+        printf("broken sort: ");
+        printArray(a, n);
+        printf("\n   expected: ");
+        printArray(expected, n);
+        printf("\n");
+        fail();
+      }
     }
   }
 }
 
 void testDevMemory(void** state) {
-  const int n = randLen();
+  const int n = randLen(1, MAX_TEST_LEN);
   const size_t size = sizeof(int32_t) * n;
   int32_t* devA = (int32_t*)cuMalloc(size);
   cuClear(devA, size);
@@ -133,16 +133,20 @@ void testReferenceSort(void** state) {
   }
 }
 
+int32_t g_mergesortBuffer[MAX_TEST_LEN];
 void hostMergesortWrap(int32_t* const a, const int n) {
-  static int32_t mergesortBuffer[MAX_RAND_ARRAY_LEN];
-  hostMergesort(a, mergesortBuffer, n);
+  hostMergesort(a, g_mergesortBuffer, n);
+}
+void hostMergesortUpWrap(int32_t* const a, const int n) {
+  hostMergesortUp(a, g_mergesortBuffer, n);
 }
 
-void testHostMergesort(void** state)  { runTest(state, hostMergesortWrap); }
-void testHostQuicksort(void** state)  { runTest(state, hostQuicksort); }
-void testHostRoughsort(void** state)  {}
-void testDevMergesort(void** state)   {}
-void testDevRoughsort(void** state)   {}
+void testHostMergesort(void** state)    { runTest(state, hostMergesortWrap); }
+void testHostMergesortUp(void** state)  { runTest(state, hostMergesortUpWrap); }
+void testHostQuicksort(void** state)    { runTest(state, hostQuicksort); }
+//void testHostRoughsort(void** state)    {}
+//void testDevMergesort(void** state)     {}
+//void testDevRoughsort(void** state)     {}
 
 /* Ensure that this PRNG never emits the same term twice within one period.
    This test might take a few minutes to run. */
@@ -171,10 +175,11 @@ int main() {
     cmocka_unit_test(testDevMemory),
     cmocka_unit_test(testDevKernel),
     cmocka_unit_test(testHostMergesort),
+    cmocka_unit_test(testHostMergesortUp),
     cmocka_unit_test(testHostQuicksort),
-    cmocka_unit_test(testHostRoughsort),
+  /*cmocka_unit_test(testHostRoughsort),
     cmocka_unit_test(testDevMergesort),
-    cmocka_unit_test(testDevRoughsort),
+    cmocka_unit_test(testDevRoughsort),*/
     cmocka_unit_test(testXorshift),
   };
 

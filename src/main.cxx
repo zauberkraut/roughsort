@@ -16,9 +16,10 @@ extern int optopt;
 namespace {
 
 enum {
-  MIN_ARRAY_LEN = 2,
+  MIN_ARRAY_LEN = 0,
   MAX_ARRAY_LEN = (1 << 30) + (1 << 29) + (1 << 28), // ~1.75 bil. ints, 7 GiB
-  DEFAULT_ARRAY_LEN = 1 << 24 // ~16 mil. ints, 64 MiB
+  MIN_RAND_LEN = 1 << 10,
+  MAX_RAND_LEN = 1 << 24
 };
 
 /* Parses an integer argument of the given radix from the command line, aborting
@@ -49,9 +50,8 @@ int msSince(timespec* start) {
   msg("roughsort [options]\n"
       "  -h        These instructions\n"
       "  -g        Skip the sequential, non-GPU algorithms\n"
-      "  -n <len>  Specify random unsorted array length (default: %d)\n"
-      "  -t        Confirm sorted array is in order\n",
-      DEFAULT_ARRAY_LEN);
+      "  -n <len>  Set randomized array length (default: random)\n"
+      "  -t        Confirm sorted array is in order\n");
   exit(1);
 }
 
@@ -69,11 +69,12 @@ int32_t* g_mergesortBuffer;
 
 int main(int argc, char* argv[]) {
   msg("Roughsort Demonstration\nA. Pfaff, J. Treadwell 2016\n");
+  randInit();
 
   bool runHostSorts = true;
   const bool runDevSorts = false; // TODO
   bool testSorted = false;
-  int arrayLen = DEFAULT_ARRAY_LEN;
+  int arrayLen = randLen(MIN_RAND_LEN, MAX_RAND_LEN);
 
   int option;
   while ((option = getopt(argc, argv, "hgn:t")) != -1) {
@@ -86,12 +87,12 @@ int main(int argc, char* argv[]) {
     case 'g':
       runHostSorts = false;
       break;
-    case 't':
-      testSorted = true;
-      break;
     case 'n':
       arrayLen = (int)parseInt(10, MIN_ARRAY_LEN, MAX_ARRAY_LEN,
-                              "invalid unsorted array length");
+                               "invalid unsorted array length");
+      break;
+    case 't':
+      testSorted = true;
       break;
 
     case '?': // deal with ill-formed parameterless option
@@ -110,8 +111,6 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  randInit();
-
   msg("allocating storage...", arrayLen);
   auto unsortedArray   = new int32_t[arrayLen],
        sortingArray    = new int32_t[arrayLen],
@@ -128,11 +127,11 @@ int main(int argc, char* argv[]) {
     timespec start;
     getTime(&start);
     referenceSort(referenceArray, arrayLen);
-    msg("%15s took %d ms", "cstdlib qsort()", msSince(&start));
+    msg("%20s took %d ms", "cstdlib qsort()", msSince(&start));
   }
 
-  auto hostMergesortWrap = [](int32_t* const a, const int n) {
-    hostMergesort(a, g_mergesortBuffer, n);
+  auto hostMergesortUpWrap = [](int32_t* const a, const int n) {
+    hostMergesortUp(a, g_mergesortBuffer, n);
   };
 
   struct {
@@ -140,11 +139,11 @@ int main(int argc, char* argv[]) {
     void (*sort)(int32_t* const, const int);
     bool runTest;
   } benchmarks[] = {
-    {"CPU Mergesort",  hostMergesortWrap, runHostSorts},
-    {"CPU Quicksort",  hostQuicksort,     runHostSorts},
-    {"CPU Roughsort",  hostRoughsort,     false && runHostSorts},
-    {"GPU Mergesort",  devMergesort,      runDevSorts},
-    {"GPU Roughsort",  devRoughsort,      runDevSorts}
+    {"CPU Mergesort (up)",  hostMergesortUpWrap, runHostSorts},
+    {"CPU Quicksort",       hostQuicksort,       runHostSorts},
+    {"CPU Roughsort",       hostRoughsort,       false && runHostSorts},
+    {"GPU Mergesort",       devMergesort,        runDevSorts},
+    {"GPU Roughsort",       devRoughsort,        runDevSorts}
   };
   const int benchmarksLen = sizeof(benchmarks) / sizeof(*benchmarks);
 
@@ -157,7 +156,7 @@ int main(int argc, char* argv[]) {
       getTime(&start);
       benchmarks[i].sort(sortingArray, arrayLen);
       auto ms = msSince(&start);
-      msg("%15s took %d ms%s", benchmarks[i].name, ms,
+      msg("%20s took %d ms%s", benchmarks[i].name, ms,
           testSorted && !testArrayEq(sortingArray, referenceArray, arrayLen) ?
             " BUT IS BROKEN" : "");
     }
