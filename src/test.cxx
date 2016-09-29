@@ -56,7 +56,21 @@ void printArray(const int* const a, const int n) {
   printf("}");
 }
 
-void runTest(void** state, void (*sort)(int32_t* const, const int)) {
+void cmpArrays(void** state, const int32_t* const a, const int32_t* const exp,
+               const int n) {
+  for (int i = 0; i < n; i++) {
+    if (a[i] != exp[i]) {
+      printf("\n   expected: ");
+      printArray(exp, n);
+      printf("        got: ");
+      printArray(a, n);
+      printf("\n");
+      fail();
+    }
+  }
+}
+
+void runSortTest(void** state, void (*sort)(int32_t* const, const int)) {
   static int32_t a[MAX_TEST_LEN];
   static int32_t expected[MAX_TEST_LEN];
 
@@ -70,16 +84,7 @@ void runTest(void** state, void (*sort)(int32_t* const, const int)) {
 
     sort(a, n);
 
-    for (int j = 0; j < n; j++) {
-      if (a[j] != expected[j]) {
-        printf("broken sort: ");
-        printArray(a, n);
-        printf("\n   expected: ");
-        printArray(expected, n);
-        printf("\n");
-        fail();
-      }
-    }
+    cmpArrays(state, a, expected, n);
   }
 }
 
@@ -110,7 +115,7 @@ void testDevMemory(void** state) {
 
 void testDevKernel(void** state) {
   int32_t a[] = {1, 2, 3}, expected[] = {1, 4, 9};
-  const int n = sizeof(a) / sizeof(*a);
+  const int n = ALEN(a);
   int32_t* devA = (int32_t*)cuMalloc(sizeof(a));
   cuUpload(devA, a, sizeof(a));
   devSquare(devA, n);
@@ -124,13 +129,48 @@ void testDevKernel(void** state) {
 }
 
 void testReferenceSort(void** state) {
-  const int n = sizeof(test19)/sizeof(*test19);
+  const int n = ALEN(test19);
   int32_t a[n];
   memcpy(a, test19, sizeof(test19));
   referenceSort(a, n);
   for (int i = 0; i < n; i++) {
     assert_int_equal(a[i], test19sorted[i]);
   }
+}
+
+void testRough(void** state) {
+  int32_t a[] =          {2, 3, 5, 1, 4, 2, 6, 8, 7, 9, 8, 11, 6, 13, 12, 16,
+                          15, 17, 18, 20, 18, 19, 21, 19};
+  int32_t expectedLR[] = {2, 3, 5, 5, 5, 5, 6, 8, 8, 9, 9, 11, 11, 13, 13, 16,
+                          16, 17, 18, 20, 20, 20, 21, 21};
+  int32_t expectedRL[] = {1, 1, 1, 1, 2, 2, 6, 6, 6, 6, 6, 6, 6, 12, 12, 15, 15,
+                          17, 18, 18, 18, 19, 19, 19};
+  int32_t expectedDM[] = {0, 1, 2, 3, 3, 4, 0, 0, 1, 2, 3, 4, 5, 0, 1, 0, 1, 0,
+                          0, 0, 1, 2, 3, 4};
+  const int expectedRough = 5;
+  const int n = ALEN(a);
+
+  assert_int_equal(ALEN(a),          ALEN(expectedLR));
+  assert_int_equal(ALEN(expectedLR), ALEN(expectedRL));
+  assert_int_equal(ALEN(expectedRL), ALEN(expectedDM));
+
+  int32_t* b = new int32_t[n];
+  buildLR(a, b, n);
+  cmpArrays(state, b, expectedLR, n);
+
+  int32_t* c = new int32_t[n];
+  buildRL(a, c, n);
+  cmpArrays(state, c, expectedRL, n);
+
+  int32_t* d = new int32_t[n];
+  buildDM(b, c, d, n);
+  cmpArrays(state, d, expectedDM, n);
+
+  assert_int_equal(rough(d, n), expectedRough);
+
+  delete[] b;
+  delete[] c;
+  delete[] d;
 }
 
 int32_t g_mergesortBuffer[MAX_TEST_LEN];
@@ -141,12 +181,26 @@ void hostMergesortUpWrap(int32_t* const a, const int n) {
   hostMergesortUp(a, g_mergesortBuffer, n);
 }
 
-void testHostMergesort(void** state)    { runTest(state, hostMergesortWrap); }
-void testHostMergesortUp(void** state)  { runTest(state, hostMergesortUpWrap); }
-void testHostQuicksort(void** state)    { runTest(state, hostQuicksort); }
-//void testHostRoughsort(void** state)    {}
-//void testDevMergesort(void** state)     {}
-//void testDevRoughsort(void** state)     {}
+void testHostMergesort(void** state) {
+  runSortTest(state, hostMergesortWrap);
+}
+void testHostMergesortUp(void** state) {
+  runSortTest(state, hostMergesortUpWrap);
+}
+void testHostQuicksort(void** state) {
+  runSortTest(state, hostQuicksort);
+}
+/*
+void testHostRoughsort(void** state) {
+  runSortTest(state, hostRoughsort);
+}
+void testDevMergesort(void** state) {
+  runSortTest(state, devMergesort);
+}
+void testDevRoughsort(void** state) {
+  runSortTest(state, devRoughsort);
+}
+*/
 
 /* Ensure that this PRNG never emits the same term twice within one period.
    This test might take a few minutes to run. */
@@ -171,9 +225,10 @@ int main() {
   randInit();
 
   const struct CMUnitTest tests[] = {
-    cmocka_unit_test(testReferenceSort),
     cmocka_unit_test(testDevMemory),
     cmocka_unit_test(testDevKernel),
+    cmocka_unit_test(testReferenceSort),
+    cmocka_unit_test(testRough),
     cmocka_unit_test(testHostMergesort),
     cmocka_unit_test(testHostMergesortUp),
     cmocka_unit_test(testHostQuicksort),

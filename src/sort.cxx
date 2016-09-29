@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include "roughsort.h"
 
 namespace {
 
@@ -75,12 +76,12 @@ void hostMergesort(int32_t* const a, int32_t* const b, const int n) {
 
 /* Linear-space, partially-optimized bottom-up mergesort. */
 void hostMergesortUp(int32_t* const a, int32_t* const b, const int n) {
-  int32_t *src = a, *dst = b;
+  auto *src = a, *dst = b;
 
   for (int runLen = 1; runLen < n; runLen <<= 1) {
     int l = 0;
     for (int r = runLen; r < n; l = r, r += runLen) {
-      const int lend = r, rend = r + runLen < n ? r + runLen : n;
+      const auto lend = r, rend = r + runLen < n ? r + runLen : n;
 
       for (int k = l; k < rend; k++) {
         auto x = (r == rend || (l != lend && src[l] <= src[r])) ?
@@ -93,7 +94,7 @@ void hostMergesortUp(int32_t* const a, int32_t* const b, const int n) {
       memcpy(dst + l, src + l, sizeof(int32_t) * (n - l));
     }
 
-    int32_t* tmp = src;
+    auto* tmp = src;
     src = dst;
     dst = tmp;
   }
@@ -126,6 +127,46 @@ void hostQuicksort(int32_t* const a, const int n) {
 
   hostQuicksort(a, i);
   hostQuicksort(a + i + 1, n - i - 1);
+}
+
+/* Generates the LR characteristic sequence of the sequence a. */
+void buildLR(const int32_t* const a, int32_t* const b, const int n) {
+  b[0] = a[0];
+  for (int i = 1; i < n; i++) {
+    b[i] = b[i-1] < a[i] ? a[i] : b[i-1];
+  }
+}
+
+/* Generates the RL characteristic sequence of the sequence a. */
+void buildRL(const int32_t* const a, int32_t* const c, const int n) {
+  c[n-1] = a[n-1];
+  for (int i = n-2; i >= 0; i--) {
+    c[i] = c[i+1] > a[i] ? a[i] : c[i+1];
+  }
+}
+
+/* Generates the disorder measure sequence of the sequence a from above. */
+void buildDM(const int32_t* const b, const int32_t* const c, int32_t* const d,
+             const int n) {
+  int i = n - 1;
+  for (int j = n-1; j >= 0; j--) {
+    while (j <= i && i >= 0 && c[i] <= b[j] &&
+         (j == 0 || c[i] >= b[j-1])) {
+      d[i] = i - j;
+      i--;
+    }
+  }
+}
+
+/* Computes the smallest k for which a is k-sorted (aka the "radius" of a). */
+int rough(const int32_t* const d, const int n) {
+  int k = INT_MIN;
+  for (int i = 0; i < n; i++) {
+    if (d[i] > k) {
+      k = d[i];
+    }
+  }
+  return k;
 }
 
 /* Sequential roughsort implementation. */
