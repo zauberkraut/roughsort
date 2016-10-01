@@ -130,7 +130,7 @@ void hostQuicksort(int32_t* const a, const int n) {
 }
 
 /* Generates the LR characteristic sequence of the sequence a. */
-void buildLR(const int32_t* const a, int32_t* const b, const int n) {
+void hostLR(const int32_t* const a, int32_t* const b, const int n) {
   b[0] = a[0];
   for (int i = 1; i < n; i++) {
     b[i] = b[i-1] < a[i] ? a[i] : b[i-1];
@@ -138,7 +138,7 @@ void buildLR(const int32_t* const a, int32_t* const b, const int n) {
 }
 
 /* Generates the RL characteristic sequence of the sequence a. */
-void buildRL(const int32_t* const a, int32_t* const c, const int n) {
+void hostRL(const int32_t* const a, int32_t* const c, const int n) {
   c[n-1] = a[n-1];
   for (int i = n-2; i >= 0; i--) {
     c[i] = c[i+1] > a[i] ? a[i] : c[i+1];
@@ -146,7 +146,7 @@ void buildRL(const int32_t* const a, int32_t* const c, const int n) {
 }
 
 /* Generates the disorder measure sequence of the sequence a from above. */
-void buildDM(const int32_t* const b, const int32_t* const c, int32_t* const d,
+void hostDM(const int32_t* const b, const int32_t* const c, int32_t* const d,
              const int n) {
   int i = n - 1;
   for (int j = n-1; j >= 0; j--) {
@@ -159,7 +159,7 @@ void buildDM(const int32_t* const b, const int32_t* const c, int32_t* const d,
 }
 
 /* Computes the smallest k for which a is k-sorted (aka the "radius" of a). */
-int rough(const int32_t* const d, const int n) {
+int hostRough(const int32_t* const d, const int n) {
   int k = INT_MIN;
   for (int i = 0; i < n; i++) {
     if (d[i] > k) {
@@ -167,6 +167,16 @@ int rough(const int32_t* const d, const int n) {
     }
   }
   return k;
+}
+
+/*   */
+void hostHalve(const int32_t* const gamma, int32_t* const delta, const int k,
+               const int n) {
+  const int r = n / (2*k);
+
+  for (int i = 0; i < r; i++) {
+
+  }
 }
 
 /* Sequential roughsort implementation. */

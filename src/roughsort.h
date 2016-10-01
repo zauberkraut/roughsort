@@ -17,11 +17,13 @@ void referenceSort(int32_t* const a, const int n);
 void hostMergesort(int32_t* const a, int32_t* const b, const int n);
 void hostMergesortUp(int32_t* const a, int32_t* const b, const int n);
 void hostQuicksort(int32_t* const a, const int n);
-void buildLR(const int32_t* const a, int32_t* const b, const int n);
-void buildRL(const int32_t* const a, int32_t* const c, const int n);
-void buildDM(const int32_t* const b, const int32_t* const c, int32_t* const d,
-             const int n);
-int rough(const int32_t* const d, const int n);
+void hostLR(const int32_t* const a, int32_t* const b, const int n);
+void hostRL(const int32_t* const a, int32_t* const c, const int n);
+void hostDM(const int32_t* const b, const int32_t* const c, int32_t* const d,
+            const int n);
+void hostHalve(const int32_t* const gamma, int32_t* const delta, const int k,
+               const int n);
+int hostRough(const int32_t* const d, const int n);
 void hostRoughsort(int32_t* const a, const int n);
 
 void devMergesort(int32_t* const a, const int n);

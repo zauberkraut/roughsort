@@ -84,7 +84,7 @@ int64_t xorsh64() {
 /* Random length for an unsorted array. */
 int randLen(int min, int max) { return randIntN(max - min + 1) + min; }
 
-/* Randomizes an integer array. */
+/* Randomizes an integer array with distinct 32-bit elements. */
 void randArray(int32_t* const a, const int n) {
   for (int i = 0; i < n; i++) {
     a[i] = xorsh();
