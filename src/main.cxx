@@ -102,25 +102,17 @@ int main(int argc, char* argv[]) {
 
   msg("allocating storage...", arrayLen);
   auto unsortedArray   = new int32_t[arrayLen],
-       sortingArray    = new int32_t[arrayLen],
-       referenceArray  = testSorted ? new int32_t[arrayLen] : nullptr;
+       sortingArray    = new int32_t[arrayLen];
+  int32_t* referenceArray  = nullptr;
   g_mergesortBuffer = new int32_t[arrayLen];
 
   const auto arraySize = sizeof(*unsortedArray) * arrayLen;
   msg("generating a random array of %d integers...", arrayLen);
   randArray(unsortedArray, arrayLen);
 
-  if (testSorted) {
-    msg("sorting reference array for comparison later...");
-    memcpy(referenceArray, unsortedArray, arraySize);
-    timespec start;
-    getTime(&start);
-    referenceSort(referenceArray, arrayLen);
-    msg("%20s took %d ms", "cstdlib qsort()", msSince(&start));
-  }
-
-  auto hostMergesortUpWrap = [](int32_t* const a, const int n) {
-    hostMergesortUp(a, g_mergesortBuffer, n);
+  auto hostMergesortWrap = [](int32_t* const a, const int n) {
+    // I'm too lazy to use std::function, hence the global var
+    hostMergesort(a, g_mergesortBuffer, n);
   };
 
   struct {
@@ -128,11 +120,12 @@ int main(int argc, char* argv[]) {
     void (*sort)(int32_t* const, const int);
     bool runTest;
   } benchmarks[] = {
-    {"CPU Mergesort (up)",  hostMergesortUpWrap, runHostSorts},
-    {"CPU Quicksort",       hostQuicksort,       runHostSorts},
-    {"CPU Roughsort",       hostRoughsort,       false && runHostSorts},
-    {"GPU Mergesort",       devMergesort,        runDevSorts},
-    {"GPU Roughsort",       devRoughsort,        runDevSorts}
+    {"CPU Mergesort", hostMergesortWrap, runHostSorts},
+    {"CPU Quicksort", hostQuicksort,     runHostSorts},
+    {"CPU Roughsort", hostRoughsort,     false && runHostSorts},
+    {"GPU Mergesort", devMergesort,      runDevSorts},
+    {"GPU Quicksort", devQuicksort,      runDevSorts},
+    {"GPU Roughsort", devRoughsort,      runDevSorts}
   };
   const int benchmarksLen = sizeof(benchmarks) / sizeof(*benchmarks);
 
@@ -140,14 +133,28 @@ int main(int argc, char* argv[]) {
 
   for (int i = 0; i < benchmarksLen; i++) {
     if (benchmarks[i].runTest) {
-      memcpy(sortingArray, unsortedArray, arraySize);
+      const bool referenceSort = testSorted && referenceArray == nullptr;
+      if (referenceSort) {
+        referenceArray = new int32_t[arrayLen];
+        msg("sorting reference array to test results...");
+      }
+
+      memcpy(referenceSort ? referenceArray : sortingArray, unsortedArray,
+             arraySize);
+
       timespec start;
       getTime(&start);
-      benchmarks[i].sort(sortingArray, arrayLen);
+      benchmarks[i].sort(referenceSort ? referenceArray : sortingArray,
+                         arrayLen);
       auto ms = msSince(&start);
-      msg("%20s took %d ms%s", benchmarks[i].name, ms,
-          testSorted && !testArrayEq(sortingArray, referenceArray, arrayLen) ?
-            " BUT IS BROKEN" : "");
+
+      auto resultMsg = "";
+      if (testSorted && !referenceSort &&
+          !testArrayEq(sortingArray, referenceArray, arrayLen)) {
+        resultMsg = " BUT IS BROKEN";
+      }
+
+      msg("%20s took %d ms%s", benchmarks[i].name, ms, resultMsg);
     }
   }
 

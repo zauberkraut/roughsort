@@ -35,22 +35,22 @@ int32_t g_test0[]  = {},
         g_test18[] = {2, 0, 1},
         g_test19[] = {1, 8, 2, 4, 6, 7, 5, 9, 0, 3},
         g_test20[] = {1, 8, 8, 4, 2, 7, 5, 9, 0, 7},
-        g_testQM0[] = {2, 3, 5, 1, 4, 2, 6, 8, 7, 9, 8, 11, 6, 13, 12,
-                       16, 15, 17, 18, 20, 18, 19, 21, 19, 30, 31, 32, 33, 34},
-        g_testLR0[] = {2, 3, 5, 5, 5, 5, 6, 8, 8, 9, 9, 11, 11, 13, 13,
-                       16, 16, 17, 18, 20, 20, 20, 21, 21, 30, 31, 32, 33, 34},
-        g_testRL0[] = {1, 1, 1, 1, 2, 2, 6, 6, 6, 6, 6, 6, 6, 12, 12, 15,
-                       15, 17, 18, 18, 18, 19, 19, 19, 30, 31, 32, 33, 34},
-        g_testDM0[] = {0, 1, 2, 3, 3, 4, 0, 0, 1, 2, 3, 4, 5, 0, 1, 0, 1,
-                       0, 0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 0},
-        g_testQM1[] = {2, 3, 5, 1, 4, 2, 6, 8, 7, 9, 8, 11, 6, 13, 12,
-                       16, 15, 17, 18, 20, 18, 19, 21, 19},
-        g_testLR1[] = {2, 3, 5, 5, 5, 5, 6, 8, 8, 9, 9, 11, 11, 13, 13,
-                       16, 16, 17, 18, 20, 20, 20, 21, 21},
-        g_testRL1[] = {1, 1, 1, 1, 2, 2, 6, 6, 6, 6, 6, 6, 6, 12, 12, 15,
-                       15, 17, 18, 18, 18, 19, 19, 19},
-        g_testDM1[] = {0, 1, 2, 3, 3, 4, 0, 0, 1, 2, 3, 4, 5, 0, 1, 0, 1,
-                       0, 0, 0, 1, 2, 3, 4};
+        g_test21[] = {2, 3, 5, 1, 4, 2, 6, 8, 7, 9, 8, 11, 6, 13, 12,
+                      16, 15, 17, 18, 20, 18, 19, 21, 19, 30, 31, 32, 33, 34},
+        g_test21LR[] = {2, 3, 5, 5, 5, 5, 6, 8, 8, 9, 9, 11, 11, 13, 13,
+                        16, 16, 17, 18, 20, 20, 20, 21, 21, 30, 31, 32, 33, 34},
+        g_test21RL[] = {1, 1, 1, 1, 2, 2, 6, 6, 6, 6, 6, 6, 6, 12, 12, 15,
+                        15, 17, 18, 18, 18, 19, 19, 19, 30, 31, 32, 33, 34},
+        g_test21DM[] = {0, 1, 2, 3, 3, 4, 0, 0, 1, 2, 3, 4, 5, 0, 1, 0, 1,
+                        0, 0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 0},
+        g_test22[] = {2, 3, 5, 1, 4, 2, 6, 8, 7, 9, 8, 11, 6, 13, 12,
+                      16, 15, 17, 18, 20, 18, 19, 21, 19},
+        g_test22LR[] = {2, 3, 5, 5, 5, 5, 6, 8, 8, 9, 9, 11, 11, 13, 13,
+                        16, 16, 17, 18, 20, 20, 20, 21, 21},
+        g_test22RL[] = {1, 1, 1, 1, 2, 2, 6, 6, 6, 6, 6, 6, 6, 12, 12, 15,
+                        15, 17, 18, 18, 18, 19, 19, 19},
+        g_test22DM[] = {0, 1, 2, 3, 3, 4, 0, 0, 1, 2, 3, 4, 5, 0, 1, 0, 1,
+                        0, 0, 0, 1, 2, 3, 4};
 const int g_testRough = 5;
 
 #define ALEN(a) (sizeof(a) / sizeof(*a))
@@ -61,7 +61,7 @@ struct Test { int32_t* const a; const int n; } g_tests[] = {
   ATEST(g_test8), ATEST(g_test9), ATEST(g_test10), ATEST(g_test11),
   ATEST(g_test12), ATEST(g_test13), ATEST(g_test14), ATEST(g_test15),
   ATEST(g_test16), ATEST(g_test17), ATEST(g_test18), ATEST(g_test19),
-  ATEST(g_test20), ATEST(g_testQM0), ATEST(g_testQM1)
+  ATEST(g_test20), ATEST(g_test21), ATEST(g_test22)
 };
 const int testCount = ALEN(g_tests);
 
@@ -77,9 +77,9 @@ void cmpArrays(void** state, const int32_t* const a, const int32_t* const exp,
                const int n) {
   for (int i = 0; i < n; i++) {
     if (a[i] != exp[i]) {
-      printf("\n   expected: ");
+      printf("\n  expected: ");
       printArray(exp, n);
-      printf("\n        got: ");
+      printf("\n       got: ");
       printArray(a, n);
       printf("\n");
       fail();
@@ -119,7 +119,7 @@ void runSortTest(void** state, void (*sort)(int32_t* const, const int)) {
 
     // perform reference sorting for comparison
     memcpy(expected, a, sizeof(*a) * n);
-    referenceSort(expected, n);
+    hostQuicksort(expected, n);
 
     sort(a, n);
 
@@ -150,48 +150,20 @@ void testDevMemory(void** state) {
   delete[] b;
 }
 
-void testDevKernel(void** state) {
-  int32_t a[] = {1, 2, 3}, expected[] = {1, 4, 9};
-  const int n = ALEN(a);
-  int32_t* const devA = (int32_t*)cuMalloc(sizeof(a));
-  cuUpload(devA, a, sizeof(a));
-  devSquare(devA, n);
-  cuDownload(a, devA, sizeof(a));
-
-  cmpArrays(state, a, expected, n);
-
-  cuFree(devA);
-}
-
-void testReferenceSort(void** state) {
-  const int expected[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-  const int n = ALEN(expected);
-  int32_t a[n];
-  memcpy(a, g_test19, sizeof(expected));
-  referenceSort(a, n);
-  cmpArrays(state, a, expected, n);
-}
-
 void testHostRough(void** state) {
-  runRoughTest(state, g_testQM0, g_testLR0, g_testRL0, g_testDM0, g_testRough,
-               ALEN(g_testQM0));
-  runRoughTest(state, g_testQM1, g_testLR1, g_testRL1, g_testDM1, g_testRough,
-               ALEN(g_testQM1));
+  runRoughTest(state, g_test21, g_test21LR, g_test21RL, g_test21DM, g_testRough,
+               ALEN(g_test21));
+  runRoughTest(state, g_test22, g_test22LR, g_test22RL, g_test22DM, g_testRough,
+               ALEN(g_test22));
 }
 
 int32_t g_mergesortBuffer[MAX_TEST_LEN];
 void hostMergesortWrap(int32_t* const a, const int n) {
   hostMergesort(a, g_mergesortBuffer, n);
 }
-void hostMergesortUpWrap(int32_t* const a, const int n) {
-  hostMergesortUp(a, g_mergesortBuffer, n);
-}
 
 void testHostMergesort(void** state) {
   runSortTest(state, hostMergesortWrap);
-}
-void testHostMergesortUp(void** state) {
-  runSortTest(state, hostMergesortUpWrap);
 }
 void testHostQuicksort(void** state) {
   runSortTest(state, hostQuicksort);
@@ -199,30 +171,14 @@ void testHostQuicksort(void** state) {
 void testHostRoughsort(void** state) {
   runSortTest(state, hostRoughsort);
 }
-/*
 void testDevMergesort(void** state) {
+  runSortTest(state, devMergesort);
+}
+void testDevQuicksort(void** state) {
   runSortTest(state, devMergesort);
 }
 void testDevRoughsort(void** state) {
   runSortTest(state, devRoughsort);
-}
-*/
-
-/* Ensure that this PRNG never emits the same term twice within one period.
-   This test might take a few minutes to run. */
-void testXorshift(void** state) {
-  auto buckets = new unsigned char[1 << 29]; // one bit marker per 32-bit term
-  memset(buckets, 0, 1 << 29);
-
-  for (int64_t iter = 0; iter < ((int64_t)1 << 32) - 1; iter++) {
-    unsigned x = (unsigned)xorsh();
-    unsigned byte = x >> 3;
-    unsigned bit = x & 7;
-    assert_false(buckets[byte] & 1 << bit);
-    buckets[byte] |= 1 << bit;
-  }
-
-  delete[] buckets;
 }
 
 } // end anonymous namespace
@@ -232,16 +188,13 @@ int main() {
 
   const struct CMUnitTest tests[] = {
     cmocka_unit_test(testDevMemory),
-    cmocka_unit_test(testDevKernel),
-    cmocka_unit_test(testReferenceSort),
     cmocka_unit_test(testHostRough),
     cmocka_unit_test(testHostMergesort),
-    cmocka_unit_test(testHostMergesortUp),
     cmocka_unit_test(testHostQuicksort),
     cmocka_unit_test(testHostRoughsort),
-  /*cmocka_unit_test(testDevMergesort),
-    cmocka_unit_test(testDevRoughsort),*/
-    cmocka_unit_test(testXorshift),
+    cmocka_unit_test(testDevMergesort),
+    cmocka_unit_test(testDevQuicksort),
+    cmocka_unit_test(testDevRoughsort),
   };
 
   return cmocka_run_group_tests(tests, 0, 0);

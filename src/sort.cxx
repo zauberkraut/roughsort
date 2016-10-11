@@ -13,27 +13,6 @@ inline void swap(int32_t* const a, const int i, const int j) {
   a[j] = l;
 }
 
-void mergesort(int32_t* const a, int32_t* const b, const int n,
-               const int depth) {
-  const auto llen = n / 2, rlen = n - llen;
-
-  if (depth) {
-    if (llen > 1) {
-      mergesort(b, a, llen, depth - 1);
-    }
-    if (rlen > 1) {
-      mergesort(b + llen, a + llen, rlen, depth - 1);
-    }
-
-    for (int l = 0, r = llen, k = l; k < n; k++) { // merge
-      auto x = (r == n || (l != llen && b[l] <= b[r])) ? b[l++] : b[r++];
-      a[k] = x;
-    }
-  } else if (a[0] > a[1]) { // order bottom-level pair in place
-    swap(a, 0, 1);
-  }
-}
-
 /* Selects the median of the first, middle and last elements of the array. */
 int median3(const int32_t* const a, int32_t* const pivot, const int n) {
   int i = n/2, j = n-1, k;
@@ -52,30 +31,8 @@ int median3(const int32_t* const a, int32_t* const pivot, const int n) {
 
 } // end anonymous namespace
 
-/* qsort() from cstdlib, used for reference. */
-void referenceSort(int32_t* const a, const int n) {
-  qsort(a, n, sizeof(*a),
-        [](const void* x, const void* y) {
-          // x - y can cause signed int overflow, whose behavior is undefined
-          return *(int32_t*)x < *(int32_t*)y ? -1 :
-                 (*(int32_t*)x > *(int32_t*)y ? 1 : 0);
-        });
-}
-
-/* Linear-space top-down mergesort. */
-void hostMergesort(int32_t* const a, int32_t* const b, const int n) {
-  if (n > 1) {
-    const auto depth = (int)floor(log2(n));
-    bool sortToB = depth & 1;
-    mergesort(sortToB ? b : a, sortToB ? a : b, n, depth);
-    if (sortToB) { // sort back to a
-      memcpy(a, b, sizeof(*a) * n);
-    }
-  }
-}
-
 /* Linear-space, partially-optimized bottom-up mergesort. */
-void hostMergesortUp(int32_t* const a, int32_t* const b, const int n) {
+void hostMergesort(int32_t* const a, int32_t* const b, const int n) {
   auto *src = a, *dst = b;
 
   for (int runLen = 1; runLen < n; runLen <<= 1) {
@@ -104,7 +61,7 @@ void hostMergesortUp(int32_t* const a, int32_t* const b, const int n) {
   }
 }
 
-/* A somewhat-lousy quicksort implementation. */
+/* A simple quicksort implementation. */
 void hostQuicksort(int32_t* const a, const int n) {
   if (n < 2) {
     return;
@@ -169,7 +126,7 @@ int hostRough(const int32_t* const d, const int n) {
   return k;
 }
 
-/*   */
+/* Produces a k-sorted sequence from a (2k + 1)-sorted one. TODO */
 void hostHalve(const int32_t* const gamma, int32_t* const delta, const int k,
                const int n) {
   const int r = n / (2*k);
