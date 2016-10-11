@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
     fatal("unexpected argument: %s", argv[optind]);
   }
 
-  msg("allocating storage...", arrayLen);
+  msg("allocating storage...");
   auto unsortedArray   = new int32_t[arrayLen],
        sortingArray    = new int32_t[arrayLen];
   int32_t* referenceArray  = nullptr;
