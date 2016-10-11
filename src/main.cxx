@@ -62,7 +62,6 @@ bool testArrayEq(const int32_t* const a, const int32_t* const b, const int n) {
   return true;
 }
 
-int32_t* g_mergesortBuffer;
 } // end anonymous namespace
 
 int main(int argc, char* argv[]) {
@@ -103,28 +102,22 @@ int main(int argc, char* argv[]) {
   auto unsortedArray   = new int32_t[arrayLen],
        sortingArray    = new int32_t[arrayLen];
   int32_t* referenceArray  = nullptr;
-  g_mergesortBuffer = new int32_t[arrayLen];
 
   const auto arraySize = sizeof(*unsortedArray) * arrayLen;
   msg("generating a random array of %d integers...", arrayLen);
   randArray(unsortedArray, arrayLen);
-
-  auto hostMergesortWrap = [](int32_t* const a, const int n) {
-    // I'm too lazy to use std::function, hence the global var
-    hostMergesort(a, g_mergesortBuffer, n);
-  };
 
   struct {
     const char* name;
     void (*sort)(int32_t* const, const int);
     bool runTest;
   } benchmarks[] = {
-    {"CPU Mergesort", hostMergesortWrap, runHostSorts},
-    {"CPU Quicksort", hostQuicksort,     runHostSorts},
-    {"CPU Roughsort", hostRoughsort,     false && runHostSorts},
-    {"GPU Mergesort", devMergesort,      false},
-    {"GPU Quicksort", devQuicksort,      false},
-    {"GPU Roughsort", devRoughsort,      false}
+    {"CPU Mergesort", hostMergesort, runHostSorts},
+    {"CPU Quicksort", hostQuicksort, runHostSorts},
+    {"CPU Roughsort", hostRoughsort, false && runHostSorts},
+    {"GPU Mergesort", devMergesort,  false},
+    {"GPU Quicksort", devQuicksort,  false},
+    {"GPU Roughsort", devRoughsort,  false}
   };
   const int benchmarksLen = sizeof(benchmarks) / sizeof(*benchmarks);
 
@@ -160,7 +153,6 @@ int main(int argc, char* argv[]) {
   delete[] unsortedArray;
   delete[] sortingArray;
   delete[] referenceArray; // nullptr deletion is safe
-  delete[] g_mergesortBuffer;
 
   return 0;
 }

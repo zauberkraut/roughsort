@@ -13,7 +13,7 @@ int64_t xorsh64();
 int randLen(int min, int max);
 void randArray(int32_t* const a, const int n);
 
-void hostMergesort(int32_t* const a, int32_t* const b, const int n);
+void hostMergesort(int32_t* const a, const int n);
 void hostQuicksort(int32_t* const a, const int n);
 void hostLR(const int32_t* const a, int32_t* const b, const int n);
 void hostRL(const int32_t* const a, int32_t* const c, const int n);

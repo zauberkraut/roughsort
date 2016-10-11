@@ -157,13 +157,8 @@ void testHostRough(void** state) {
                ALEN(g_test22));
 }
 
-int32_t g_mergesortBuffer[MAX_TEST_LEN];
-void hostMergesortWrap(int32_t* const a, const int n) {
-  hostMergesort(a, g_mergesortBuffer, n);
-}
-
 void testHostMergesort(void** state) {
-  runSortTest(state, hostMergesortWrap);
+  runSortTest(state, hostMergesort);
 }
 void testHostQuicksort(void** state) {
   runSortTest(state, hostQuicksort);
