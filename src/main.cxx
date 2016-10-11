@@ -70,7 +70,6 @@ int main(int argc, char* argv[]) {
   randInit();
 
   bool runHostSorts = true;
-  const bool runDevSorts = false; // TODO
   bool testSorted = false;
   int arrayLen = randLen(MIN_RAND_LEN, MAX_RAND_LEN);
 
@@ -123,9 +122,9 @@ int main(int argc, char* argv[]) {
     {"CPU Mergesort", hostMergesortWrap, runHostSorts},
     {"CPU Quicksort", hostQuicksort,     runHostSorts},
     {"CPU Roughsort", hostRoughsort,     false && runHostSorts},
-    {"GPU Mergesort", devMergesort,      runDevSorts},
-    {"GPU Quicksort", devQuicksort,      runDevSorts},
-    {"GPU Roughsort", devRoughsort,      runDevSorts}
+    {"GPU Mergesort", devMergesort,      false},
+    {"GPU Quicksort", devQuicksort,      false},
+    {"GPU Roughsort", devRoughsort,      false}
   };
   const int benchmarksLen = sizeof(benchmarks) / sizeof(*benchmarks);
 
