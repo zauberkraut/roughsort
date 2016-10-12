@@ -48,6 +48,7 @@ int msSince(timespec* start) {
   msg("roughsort [options]\n"
       "  -h        These instructions\n"
       "  -g        Skip the sequential, non-GPU algorithms\n"
+      "  -k <int>  Set the k-sortedness of the random array (default: don't k-sort)\n"
       "  -n <len>  Set randomized array length (default: random)\n"
       "  -t        Confirm sorted array is in order\n");
   exit(1);
@@ -69,11 +70,12 @@ int main(int argc, char* argv[]) {
   randInit();
 
   bool runHostSorts = true;
-  bool testSorted = false;
+  int k = -1;
   int arrayLen = randLen(MIN_RAND_LEN, MAX_RAND_LEN);
+  bool testSorted = false;
 
   int option;
-  while ((option = getopt(argc, argv, "hgn:t")) != -1) {
+  while ((option = getopt(argc, argv, "hgk:n:t")) != -1) {
     switch (option) {
     case 'h':
       usage();
@@ -81,10 +83,16 @@ int main(int argc, char* argv[]) {
     case 'g':
       runHostSorts = false;
       break;
+
+    case 'k':
+      k = (int)parseInt(10, 0, MAX_ARRAY_LEN, "invalid k-sortedness");
+      break;
+
     case 'n':
       arrayLen = (int)parseInt(10, MIN_ARRAY_LEN, MAX_ARRAY_LEN,
                                "invalid unsorted array length");
       break;
+
     case 't':
       testSorted = true;
       break;
@@ -97,6 +105,9 @@ int main(int argc, char* argv[]) {
   if (optind < argc) { // reject extra arguments
     fatal("unexpected argument: %s", argv[optind]);
   }
+  if (k >= arrayLen) {
+    fatal("an array of length %d can't be %d-sorted!", arrayLen, k);
+  }
 
   msg("allocating storage...");
   auto unsortedArray   = new int32_t[arrayLen],
@@ -105,7 +116,7 @@ int main(int argc, char* argv[]) {
 
   const auto arraySize = sizeof(*unsortedArray) * arrayLen;
   msg("generating a random array of %d integers...", arrayLen);
-  randArray(unsortedArray, arrayLen);
+  randArray(unsortedArray, arrayLen, k);
 
   struct {
     const char* name;
