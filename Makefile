@@ -6,22 +6,20 @@ bin = $(root)/$(name)
 testbin = $(build)/test
 tex = $(root)/tex
 
-cc = g++
-nvcc = nvcc
+cc = nvcc
 
 main = $(build)/main.o
 modules = $(build)/random.o $(build)/sort.o $(build)/sort.obj \
           $(build)/util.o $(build)/util.obj
 tests = $(build)/test.o
 
-oflags = -O3
+oflags = -O4
 wflags = -Wall -Werror
-cflags = -std=c++11 -mrdrnd $(oflags) $(wflags) -I/usr/local/cuda/include
-nvflags = -std c++11 $(oflags) -Xcompiler "$(wflags)"
-libs = -lm -lpthread -L/usr/local/cuda/lib64 -lcudart
+# note GCC RDRAND flag "-mrdrnd"
+cflags = -std c++11 $(oflags) -Xcompiler "-mrdrnd $(wflags)"
 
 $(bin): $(main) $(modules)
-	$(cc) -o $(@) $(^) $(libs)
+	$(cc) -o $(@) $(^)
 
 $(build)/%.o: $(src)/%.cxx
 	@mkdir -p $(build)
@@ -29,13 +27,13 @@ $(build)/%.o: $(src)/%.cxx
 
 $(build)/%.obj: $(src)/%.cu
 	@mkdir -p $(build)
-	$(nvcc) -o $(@) $(nvflags) -c $(<)
+	$(cc) -o $(@) $(cflags) -c $(<)
 
 debug: oflags = -O0 -g
 debug: $(bin)
 
 $(testbin): $(tests) $(modules)
-	$(cc) -o $(@) $(^) -lcmocka $(libs)
+	$(cc) -o $(@) $(^) -lcmocka
 
 .PHONY: test clean
 test: $(testbin)
