@@ -109,16 +109,16 @@ void runRoughTest(void** state, int32_t* const a, int32_t* const lr,
   delete[] d;
 }
 
-void runSortTest(void** state, void (*sort)(int32_t* const, const int)) {
+void runHostSortTest(void** state, void (*sort)(int32_t* const, const int)) {
   static int32_t a[MAX_TEST_LEN];
   static int32_t expected[MAX_TEST_LEN];
 
   for (int i = 0; i < testCount; i++) {
     const auto n = g_tests[i].n;
-    memcpy(a, g_tests[i].a, sizeof(*a) * n);
+    memcpy(a, g_tests[i].a, 4*n);
 
     // perform reference sorting for comparison
-    memcpy(expected, a, sizeof(*a) * n);
+    memcpy(expected, a, 4*n);
     hostQuicksort(expected, n);
 
     sort(a, n);
@@ -127,9 +127,32 @@ void runSortTest(void** state, void (*sort)(int32_t* const, const int)) {
   }
 }
 
+void runDevSortTest(void** state, void (*sort)(int32_t* const, const int)) {
+  static int32_t hostA[MAX_TEST_LEN];
+  int32_t* const devA =
+    static_cast<int32_t* const>(cuMalloc(4 * MAX_TEST_LEN));
+  static int32_t expected[MAX_TEST_LEN];
+
+  for (int i = 0; i < testCount; i++) {
+    const auto n = g_tests[i].n;
+    cuUpload(devA, g_tests[i].a, 4*n);
+
+    // perform reference sorting for comparison
+    memcpy(expected, g_tests[i].a, 4*n);
+    hostQuicksort(expected, n);
+
+    sort(devA, n);
+
+    cuDownload(hostA, devA, 4*n);
+    cmpArrays(state, hostA, expected, n);
+  }
+
+  cuFree(devA);
+}
+
 void testDevMemory(void** state) {
   const int n = randLen(1, MAX_TEST_LEN);
-  const size_t size = sizeof(int32_t) * n;
+  const size_t size = 4 * n;
   int32_t* const devA = (int32_t* const)cuMalloc(size);
   cuClear(devA, size);
 
@@ -158,22 +181,22 @@ void testHostRough(void** state) {
 }
 
 void testHostMergesort(void** state) {
-  runSortTest(state, hostMergesort);
+  runHostSortTest(state, hostMergesort);
 }
 void testHostQuicksort(void** state) {
-  runSortTest(state, hostQuicksort);
+  runHostSortTest(state, hostQuicksort);
 }
 void testHostRoughsort(void** state) {
-  runSortTest(state, hostRoughsort);
+  runHostSortTest(state, hostRoughsort);
 }
 void testDevMergesort(void** state) {
-  runSortTest(state, devMergesort);
+  runDevSortTest(state, devMergesort);
 }
 void testDevQuicksort(void** state) {
-  runSortTest(state, devMergesort);
+  runDevSortTest(state, devMergesort);
 }
 void testDevRoughsort(void** state) {
-  runSortTest(state, devRoughsort);
+  runDevSortTest(state, devRoughsort);
 }
 
 } // end anonymous namespace

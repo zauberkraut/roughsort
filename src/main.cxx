@@ -109,61 +109,77 @@ int main(int argc, char* argv[]) {
     fatal("an array of length %d can't be %d-sorted!", arrayLen, k);
   }
 
+  const auto arraySize = 4*arrayLen;
   msg("allocating storage...");
-  auto unsortedArray   = new int32_t[arrayLen],
-       sortingArray    = new int32_t[arrayLen];
-  int32_t* referenceArray  = nullptr;
+  int32_t* const hostUnsortedArray = new int32_t[arrayLen];
+  int32_t* const hostSortingArray  = new int32_t[arrayLen];
+  int32_t* hostReferenceArray = nullptr;
+  int32_t* const devSortingArray = (int32_t*)cuMalloc(arraySize);
 
-  const auto arraySize = sizeof(*unsortedArray) * arrayLen;
   msg("generating a random array of %d integers...", arrayLen);
-  randArray(unsortedArray, arrayLen, k);
+  randArray(hostUnsortedArray, arrayLen, k);
 
   struct {
     const char* name;
     void (*sort)(int32_t* const, const int);
     bool runTest;
+    bool onGPU;
   } benchmarks[] = {
-    {"CPU Mergesort", hostMergesort, runHostSorts},
-    {"CPU Quicksort", hostQuicksort, runHostSorts},
-    {"CPU Roughsort", hostRoughsort, false && runHostSorts},
-    {"GPU Mergesort", devMergesort,  false},
-    {"GPU Quicksort", devQuicksort,  false},
-    {"GPU Roughsort", devRoughsort,  false}
+    {"CPU Mergesort", hostMergesort, runHostSorts, false},
+    {"CPU Quicksort", hostQuicksort, runHostSorts, false},
+    {"CPU Roughsort", hostRoughsort, false && runHostSorts, false},
+    {"GPU Mergesort", devMergesort,  true, true},
+    {"GPU Quicksort", devQuicksort,  true, true},
+    {"GPU Roughsort", devRoughsort,  false, true}
   };
-  const int benchmarksLen = sizeof(benchmarks) / sizeof(*benchmarks);
 
   msg("running sort algorithm benchmarks...");
 
-  for (int i = 0; i < benchmarksLen; i++) {
-    if (benchmarks[i].runTest) {
-      const bool referenceSort = testSorted && referenceArray == nullptr;
-      if (referenceSort) {
-        referenceArray = new int32_t[arrayLen];
-        msg("sorting reference array to test results...");
-      }
+  for (auto const bench : benchmarks) {
+    if (bench.runTest) {
+      const bool referenceSort = testSorted && hostReferenceArray == nullptr;
 
-      memcpy(referenceSort ? referenceArray : sortingArray, unsortedArray,
-             arraySize);
+      if (bench.onGPU) {
+        cuUpload(devSortingArray, hostUnsortedArray, arraySize);
+      } else {
+        memcpy(hostSortingArray, hostUnsortedArray, arraySize);
+      }
 
       timespec start;
       getTime(&start);
-      benchmarks[i].sort(referenceSort ? referenceArray : sortingArray,
-                         arrayLen);
+      bench.sort(bench.onGPU ? devSortingArray : hostSortingArray, arrayLen);
       auto ms = msSince(&start);
 
       auto resultMsg = "";
-      if (testSorted && !referenceSort &&
-          !testArrayEq(sortingArray, referenceArray, arrayLen)) {
-        resultMsg = " BUT IS BROKEN";
+
+      if (referenceSort) {
+        /* NOTE: We could maintain separate reference and unsorted arrays on the
+                 GPU, but we probably can't afford the extra device RAM and
+                 won't need the speedup. */
+        hostReferenceArray = new int32_t[arrayLen];
+        msg("copying sorted array to reference for testing further results...");
+        if (bench.onGPU) {
+          cuDownload(hostReferenceArray, devSortingArray, arraySize);
+        } else {
+          memcpy(hostReferenceArray, hostSortingArray, arraySize);
+        }
+      } else if (testSorted) {
+        if (bench.onGPU) {
+          cuDownload(hostSortingArray, devSortingArray, arraySize);
+        }
+        if(!testArrayEq(hostSortingArray, hostReferenceArray, arrayLen)) {
+          resultMsg = " BUT IS BROKEN";
+        }
       }
 
-      msg("%20s took %d ms%s", benchmarks[i].name, ms, resultMsg);
+      msg("  %s took %d ms%s", bench.name, ms, resultMsg);
     }
   }
 
-  delete[] unsortedArray;
-  delete[] sortingArray;
-  delete[] referenceArray; // nullptr deletion is safe
+  delete[] hostUnsortedArray;
+  delete[] hostSortingArray;
+  delete[] hostReferenceArray; // nullptr deletion is safe
+  cuFree(devSortingArray);
 
   return 0;
 }
