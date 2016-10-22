@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include "cmocka.h"
 
 namespace {
 
@@ -25,7 +26,7 @@ void warn(const char* s, ...) {
   print(stderr, s, args);
 }
 
-[[ noreturn ]] void fatal(const char* s, ...) {
+void fatal(const char* s, ...) {
   fprintf(stderr, "FATAL: ");
   va_list args; va_start(args, s);
   print(stderr, s, args);

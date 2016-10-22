@@ -4,7 +4,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <unistd.h>
+#include <time.h>
+#include "wingetopt.h"
 #include "roughsort.h"
 
 // for dealing with getopt arguments
@@ -33,18 +34,15 @@ int parseInt(int radix, int min, int max, const char* errMsg) {
   return i;
 }
 
-void getTime(timespec* start) {
-  clock_gettime(CLOCK_MONOTONIC, start);
+void getTime(void* start) 
+{
+  //clock_gettime(CLOCK_MONOTONIC, start)
+	return;
 }
 
-int msSince(timespec* start) {
-  timespec time;
-  getTime(&time);
-  return (time.tv_sec - start->tv_sec)*1000 +
-         (time.tv_nsec - start->tv_nsec)/1.e6;
-}
 
-[[ noreturn ]] void usage() {
+
+void usage() {
   msg("roughsort [options]\n"
       "  -h        These instructions\n"
       "  -g        Skip the sequential, non-GPU algorithms\n"
@@ -145,10 +143,7 @@ int main(int argc, char* argv[]) {
         memcpy(hostSortingArray, hostUnsortedArray, arraySize);
       }
 
-      timespec start;
-      getTime(&start);
       bench.sort(bench.onGPU ? devSortingArray : hostSortingArray, arrayLen);
-      auto ms = msSince(&start);
 
       auto resultMsg = "";
 
@@ -172,7 +167,7 @@ int main(int argc, char* argv[]) {
         }
       }
 
-      msg("  %s took %d ms%s", bench.name, ms, resultMsg);
+      msg("  %s took %d ms%s", bench.name, 0, resultMsg);
     }
   }
 

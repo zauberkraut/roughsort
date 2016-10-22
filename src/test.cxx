@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstdio>
 extern "C" {
-#include <cmocka.h>
+#include "cmocka.h"
 }
 #include <cstring>
 #include "roughsort.h"
@@ -14,7 +14,7 @@ extern "C" {
 namespace {
 
 enum { MAX_TEST_LEN = 64 }; // UPDATE IF A LONGER TEST IS ADDED
-int32_t g_test0[]  = {},
+int32_t g_test0[]  = {0},
         g_test1[]  = {0},
         g_test2[]  = {0, 0},
         g_test3[]  = {0, 1},
@@ -201,7 +201,7 @@ void testDevRoughsort(void** state) {
 
 } // end anonymous namespace
 
-int main() {
+int main2() {
   randInit();
 
   const struct CMUnitTest tests[] = {

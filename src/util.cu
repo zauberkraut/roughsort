@@ -1,6 +1,11 @@
 /* util.cu: CUDA convenience functions. */
 
 #include "roughsort.h"
+#include <cuda.h>
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include "device_functions.h"
+#include "math_functions.h"
 
 // TODO: propagate __FILE__ and __LINE__ from caller if GDB proves inadequate
 #define CHECK(r) cuCheck(r, __FILE__, __LINE__)

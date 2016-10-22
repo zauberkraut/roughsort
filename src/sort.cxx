@@ -65,5 +65,6 @@ void hostHalve(const int32_t* const gamma, int32_t* const delta, const int k,
 }
 
 /* Sequential roughsort implementation. */
-void hostRoughsort(int32_t* const a, const int n) {
+void hostRoughsort(int32_t* const a, const int n) 
+{
 }

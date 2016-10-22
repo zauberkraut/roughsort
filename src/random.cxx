@@ -1,7 +1,7 @@
 /* random.cxx: (P)RNGs and random sequence generator. */
 
 #include <climits>
-#include <cpuid.h>
+//#include <cpuid.h>
 #include <ctime>
 #include <immintrin.h>
 #include <cstdlib>
@@ -15,7 +15,7 @@ uint64_t state64;
 /* Tests for CPU support of the RDRAND instruction. */
 bool rdRandSupported() {
   unsigned eax, ebx, ecx, edx;
-  return __get_cpuid(1, &eax, &ebx, &ecx, &edx) && ecx & bit_RDRND;
+  return true;
 }
 
 /* Uses RDRAND instruction to generate high-quality random integers.
@@ -32,8 +32,9 @@ int32_t rdRand() {
   return (int32_t)(r ^ rand());
 }
 
-[[ noreturn ]] int32_t nullRand() {
+int32_t nullRand() {
   fatal("randInt() was invoked before initialization!");
+  return 0;
 }
 
 } // end anonymous namespace
