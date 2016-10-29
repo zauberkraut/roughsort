@@ -7,6 +7,7 @@
 #include <time.h>
 #include "wingetopt.h"
 #include "roughsort.h"
+#include <iostream>
 
 // for dealing with getopt arguments
 extern char *optarg;
@@ -116,6 +117,9 @@ int main(int argc, char* argv[]) {
 
   msg("generating a random array of %d integers...", arrayLen);
   randArray(hostUnsortedArray, arrayLen, k);
+ 
+
+
 
   struct {
     const char* name;
@@ -127,8 +131,10 @@ int main(int argc, char* argv[]) {
     {"CPU Quicksort", hostQuicksort, runHostSorts, false},
     {"CPU Roughsort", hostRoughsort, false && runHostSorts, false},
     {"GPU Mergesort", devMergesort,  true, true},
+	{ "GPU Sortedness Check", devCheckSortedness, true, true },
     {"GPU Quicksort", devQuicksort,  true, true},
-    {"GPU Roughsort", devRoughsort,  false, true}
+	{ "GPU Roughsort", devRoughsort, false, true },
+
   };
 
   msg("running sort algorithm benchmarks...");
@@ -158,13 +164,30 @@ int main(int argc, char* argv[]) {
         } else {
           memcpy(hostReferenceArray, hostSortingArray, arraySize);
         }
-      } else if (testSorted) {
+      } else if (testSorted) 
+	  {
         if (bench.onGPU) {
           cuDownload(hostSortingArray, devSortingArray, arraySize);
         }
         if(!testArrayEq(hostSortingArray, hostReferenceArray, arrayLen)) {
           resultMsg = " BUT IS BROKEN";
         }
+
+		if (arrayLen < 10)
+		{
+			for (int i = 0; i < arrayLen; i++)
+			{
+				std::cout << "\t" << i << "," << hostSortingArray[i];
+				for (int j = 0; j < arrayLen; j++)
+				{
+					if (hostReferenceArray[j] == hostSortingArray[i])
+					{
+						std::cout << "[" << abs(i - j) << "]" << std::endl;
+					}
+				}
+			}
+		}
+
       }
 
       msg("  %s took %d ms%s", bench.name, 0, resultMsg);
