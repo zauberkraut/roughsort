@@ -121,8 +121,8 @@ void devCheckSortedness(int32_t* const a, const int n)
 
 	CHECK(cudaGetLastError());
 	std::cout << "K value: " << k_host << std::endl;
-
-
+	cuFree(k_dev);
+	cuFree(sorted_dev);
 
 
 }
