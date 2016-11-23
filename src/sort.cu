@@ -2,6 +2,7 @@
 
 #include "thrust/device_ptr.h"
 #include "thrust/sort.h"
+#include <thrust/extrema.h>
 #include "roughsort.h"
 #include <cuda.h>
 #include "cuda_runtime.h"
@@ -10,6 +11,9 @@
 #include "math_functions.h"
 #include "sm_20_atomic_functions.h"
 #include <iostream>
+#include "Lock.h"
+
+using namespace std;
 
 #define CHECK(r) cuCheck(r, __FILE__, __LINE__) //TODO: get util.h created for windows branch
 inline void cuCheck(cudaError_t r, const char* fname, const size_t lnum);
@@ -32,8 +36,7 @@ void devRoughsort(int32_t* const a, const int n)
 }
 
 
-
-__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, bool * sorted)
+__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r, Lock lock)
 {
 
 	
@@ -45,26 +48,68 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 	int local_id = -1;
 	if (thread_id < n)
 		local_id = (int)thread_id;
-	
-	int i = 1;
-	for (; i < n && local_id < n && local_id >= 0 && *sorted == false; i++) //naive k check
-	{
-		*sorted = true;
-		if (local_id + i < n && a[local_id] > a[local_id + i])
-			*sorted = false;
-		
+	else
+		return;
 
-		if (local_id - i >= 0 && a[local_id] < a[local_id - i])
-			*sorted = false;
-		
-		if (*sorted == true)
-			*k = i;
+	b[local_id] = a[local_id];
+	c[local_id] = a[local_id];
+	
+	//max-prefix - 
+	for (int r = 0; r < log2((float)n); r++)
+	{
+		bool sorted = true;
+		for (int i = 1; i < n; i++)
+		{
+
+			if (a[i] < a[i - 1])
+				sorted = false;
+		}
+		if (sorted == true)
+		{
+			break;
+		}
+		else if (local_id - exp2((float)r) >= 0)
+		{
+			int idx = local_id - exp2((float)r);
+			b[local_id] = max(a[local_id], a[idx]);
+		}
+	}
+	//min-prefix
+	for (int r = 0; r < log2((float)n); r++)
+	{
+		bool sorted = true;
+		for (int i = 1; i < n; i++)
+		{
+
+			if (a[i] < a[i - 1])
+				sorted = false;
+		}
+		if (sorted == true)
+		{
+			break;
+		}
+		else if (local_id - exp2((float)r) >= 0)
+		{
+			int idx = local_id - exp2((float)r);
+			c[local_id] = min(a[local_id], a[idx]);
+		}
+	}
+	//d
+	int i = n;
+	while ((local_id <= i) && (i > 0) && c[i] <= b[local_id] && ((local_id == 0) || (c[i] >= b[local_id - 1])))
+	{
+		lock.lock();
+		d[i] = i - local_id;
+		lock.unlock();
+		i--;
 	}
 
+	//use thrust maxelement to find max of d, which is k
 
-	if (*sorted == false)
-		*k = -n;
-	
+	thrust::device_ptr<int32_t> d_start = thrust::device_pointer_cast((int32_t*)d);
+	thrust::device_ptr<int32_t> d_end = thrust::device_pointer_cast((int32_t*)(d + n - 1));
+	*k = *(thrust::max_element(thrust::device, d_start, d_end));
+
 }
 
 void devCheckSortedness(int32_t* const a, const int n)
@@ -102,27 +147,32 @@ void devCheckSortedness(int32_t* const a, const int n)
 	dim3 dimBlock(threadblockX, threadblockY, threadblockZ);
 	dim3 dimGrid(gridX, gridY, 1);
 
-	int * k_dev = (int*)cuMalloc(sizeof(int));
-	bool * sorted_dev = (bool*)cuMalloc(sizeof(bool));
-	bool sorted_host = false;
-	int k_val = -1;
-	CHECK(cudaMemcpy((void*)sorted_dev, (void*)&sorted_host, sizeof(bool), cudaMemcpyHostToDevice));
-	CHECK(cudaMemcpy((void*)k_dev, (void*)&k_val, sizeof(int), cudaMemcpyHostToDevice));
+	int * b = (int*)cuMalloc(sizeof(int) * n);
+	int * c = (int*)cuMalloc(sizeof(int) * n);
+	int * d = (int*)cuMalloc(sizeof(int) * n);
+	int * r = (int*)cuMalloc(sizeof(int));
+	int * k = (int*)cuMalloc(sizeof(int));
+	Lock lock;
 
 
-	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k_dev, sorted_dev);
+	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k, b, c, d, r, lock);
 
 
 	cudaThreadSynchronize();
 	cudaDeviceSynchronize();
 
 	int k_host;
-	cudaMemcpy(&k_host, k_dev, sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&k_host, k, sizeof(int), cudaMemcpyDeviceToHost);
 
 	CHECK(cudaGetLastError());
 	std::cout << "K value: " << k_host << std::endl;
-	cuFree(k_dev);
-	cuFree(sorted_dev);
+
+	cuFree(b);
+	cuFree(c);
+	cuFree(d);
+	cuFree(r);
+	cuFree(k);
+
 
 
 }
