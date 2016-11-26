@@ -11,12 +11,13 @@
 #include "math_functions.h"
 #include "sm_20_atomic_functions.h"
 #include <iostream>
-#include "Lock.h"
+
 
 using namespace std;
 
 #define CHECK(r) cuCheck(r, __FILE__, __LINE__) //TODO: get util.h created for windows branch
 inline void cuCheck(cudaError_t r, const char* fname, const size_t lnum);
+
 
 
 void devMergesort(int32_t* const a, const int n) {
@@ -36,7 +37,7 @@ void devRoughsort(int32_t* const a, const int n)
 }
 
 
-__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r, Lock lock)
+__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r)
 {
 
 	
@@ -50,18 +51,17 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 		local_id = (int)thread_id;
 	else
 		return;
-
+	
 	b[local_id] = a[local_id];
 	c[local_id] = a[local_id];
-	
 	//max-prefix - 
-	for (int r = 0; r < log2((float)n); r++)
+	for (int r = 0; r <= log2((float)(n - 1)); r++)
 	{
 		bool sorted = true;
 		for (int i = 1; i < n; i++)
 		{
 
-			if (a[i] < a[i - 1])
+			if (b[i] < b[i - 1])
 				sorted = false;
 		}
 		if (sorted == true)
@@ -71,17 +71,17 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 		else if (local_id - exp2((float)r) >= 0)
 		{
 			int idx = local_id - exp2((float)r);
-			b[local_id] = max(a[local_id], a[idx]);
+			b[local_id] = max(b[local_id], b[idx]);
 		}
 	}
 	//min-prefix
-	for (int r = 0; r < log2((float)n); r++)
+	for (int r = 0; r <= log2((float)(n - 1)); r++)
 	{
 		bool sorted = true;
 		for (int i = 1; i < n; i++)
 		{
 
-			if (a[i] < a[i - 1])
+			if (c[i] < c[i - 1])
 				sorted = false;
 		}
 		if (sorted == true)
@@ -91,24 +91,31 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 		else if (local_id - exp2((float)r) >= 0)
 		{
 			int idx = local_id - exp2((float)r);
-			c[local_id] = min(a[local_id], a[idx]);
+			c[local_id] = min(c[local_id], c[idx]);
 		}
 	}
-	//d
-	int i = n;
-	while ((local_id <= i) && (i > 0) && c[i] <= b[local_id] && ((local_id == 0) || (c[i] >= b[local_id - 1])))
-	{
-		lock.lock();
-		d[i] = i - local_id;
-		lock.unlock();
-		i--;
-	}
+	
+	bool isSet = false; //StackOverflow -- https://stackoverflow.com/questions/21341495/cuda-mutex-and-atomiccas
+	do {
 
+		if (isSet = atomicCAS(r, 0, 1) == 0)
+		{
+			int i = n - 1;
+			while ((local_id <= i) && (i >= 0) && c[i] <= b[local_id] && ((local_id == 0) || (c[i] >= b[local_id - 1])))
+			{
+				d[i] = i - local_id;
+				i--;
+			}
+		}
+		if (isSet)
+		{
+			*r = 0;
+		}
+	} while (!isSet);
 	//use thrust maxelement to find max of d, which is k
-
-	thrust::device_ptr<int32_t> d_start = thrust::device_pointer_cast((int32_t*)d);
-	thrust::device_ptr<int32_t> d_end = thrust::device_pointer_cast((int32_t*)(d + n - 1));
-	*k = *(thrust::max_element(thrust::device, d_start, d_end));
+	
+	*k = *(thrust::max_element(thrust::device, &d[0], &d[n]));
+	
 
 }
 
@@ -152,27 +159,44 @@ void devCheckSortedness(int32_t* const a, const int n)
 	int * d = (int*)cuMalloc(sizeof(int) * n);
 	int * r = (int*)cuMalloc(sizeof(int));
 	int * k = (int*)cuMalloc(sizeof(int));
-	Lock lock;
+	
+	int r_host = 0;
 
+	cudaMemcpy(r, &r_host, 1, cudaMemcpyHostToDevice);
 
-	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k, b, c, d, r, lock);
+	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k, b, c, d, r);
 
 
 	cudaThreadSynchronize();
 	cudaDeviceSynchronize();
 
 	int k_host;
+	int * b_host = (int*)malloc(sizeof(int)* n);
+	int * c_host = (int*)malloc(sizeof(int)* n);
+	int * d_host = (int*)malloc(sizeof(int)* n);
 	cudaMemcpy(&k_host, k, sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(b_host, b, sizeof(int) * n, cudaMemcpyDeviceToHost);
+	cudaMemcpy(c_host, c, sizeof(int) * n, cudaMemcpyDeviceToHost);
+	cudaMemcpy(d_host, d, sizeof(int) * n, cudaMemcpyDeviceToHost);
 
 	CHECK(cudaGetLastError());
 	std::cout << "K value: " << k_host << std::endl;
 
+	for (int i = 0; i < n; i++)
+	{
+		cout << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << endl;
+	}
+	
 	cuFree(b);
+	CHECK(cudaGetLastError());
 	cuFree(c);
+	CHECK(cudaGetLastError());
 	cuFree(d);
+	CHECK(cudaGetLastError());
 	cuFree(r);
+	CHECK(cudaGetLastError());
 	cuFree(k);
-
+	CHECK(cudaGetLastError());
 
 
 }
