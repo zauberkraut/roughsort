@@ -2,9 +2,10 @@
 
 #include <climits>
 #include <cpuid.h>
+#include <cstdlib>
 #include <ctime>
 #include <immintrin.h>
-#include <cstdlib>
+#include <thread>
 #include "roughsort.h"
 
 namespace {
@@ -84,11 +85,39 @@ int64_t xorsh64() {
 /* Random length for an unsorted array. */
 int randLen(int min, int max) { return randIntN(max - min + 1) + min; }
 
+#define NTHREADS 8
+void randRun(int thId, int32_t* a, int n) {
+  for (int i = thId; i < n; i += NTHREADS) {
+    a[i] = randInt();
+  }
+}
+
 /* Randomizes an integer array with distinct 32-bit elements. */
-void randArray(int32_t* const a, const int n, const int k) {
-  for (int i = 0; i < n; i++) {
-    a[i] = xorsh();
+void randArray(int32_t* const a, const int k, const int n) {
+  std::thread runs[NTHREADS];
+
+  for (int i = 0; i < NTHREADS; i++) {
+    runs[i] = std::thread(randRun, i, a, n);
   }
 
+  for (int i = 0; i < NTHREADS; i++) {
+    runs[i].join();
+  }
+
+  /*for (int i = 0; i < n; i++) {
+    printf("%d, ", a[i]);
+  }
+  printf("\n");*/
   // TODO: sort the array and k-disorder it (k == -1 => don't bother)
+  int32_t* b = new int[n]; // we never release these
+  int32_t* c = new int[n];
+  int32_t* d = new int[n];
+  hostLR(a, b, n);
+  hostRL(a, c, n);
+  hostDM(b, c, d, n);
+  const int radius = hostRough(d, n);
+  delete[] b;
+  delete[] c;
+  delete[] d;
+  printf("random array is %d-sorted\n", radius);
 }

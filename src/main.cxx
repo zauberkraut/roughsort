@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
   int32_t* const devSortingArray = (int32_t*)cuMalloc(arraySize);
 
   msg("generating a random array of %d integers...", arrayLen);
-  randArray(hostUnsortedArray, arrayLen, k);
+  randArray(hostUnsortedArray, k, arrayLen);
 
   struct {
     const char* name;
@@ -127,7 +127,7 @@ int main(int argc, char* argv[]) {
   } benchmarks[] = {
     {"CPU Mergesort", hostMergesort, runHostSorts, false},
     {"CPU Quicksort", hostQuicksort, runHostSorts, false},
-    {"CPU Roughsort", hostRoughsort, false && runHostSorts, false},
+    {"CPU Roughsort", hostRoughsort, runHostSorts, false},
     {"GPU Mergesort", devMergesort,  true, true},
     {"GPU Quicksort", devQuicksort,  true, true},
     {"GPU Roughsort", devRoughsort,  false, true}

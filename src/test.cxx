@@ -163,7 +163,7 @@ void testDevMemory(void** state) {
   }
 
   auto b = new int32_t[n];
-  randArray(a, n);
+  randArray(a, -1, n);
   cuUpload(devA, a, size);
   cuDownload(b, devA, size);
   cmpArrays(state, b, a, n);

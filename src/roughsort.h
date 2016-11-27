@@ -11,7 +11,7 @@ void randInit();
 int32_t xorsh();
 int64_t xorsh64();
 int randLen(int min, int max);
-void randArray(int32_t* const a, const int n, const int k = -1);
+void randArray(int32_t* const a, const int k, const int n);
 
 void hostMergesort(int32_t* const a, const int n);
 void hostQuicksort(int32_t* const a, const int n);
