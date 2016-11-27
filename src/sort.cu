@@ -17,6 +17,7 @@ using namespace std;
 
 #define CHECK(r) cuCheck(r, __FILE__, __LINE__) //TODO: get util.h created for windows branch
 inline void cuCheck(cudaError_t r, const char* fname, const size_t lnum);
+__device__ void devCheckIfSorted(int32_t* a, int n, int local_id, bool * sorted);
 
 
 
@@ -37,34 +38,30 @@ void devRoughsort(int32_t* const a, const int n)
 }
 
 
-__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r)
+__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r, bool * sorted)
 {
 
-	
+
 	unsigned long long threadXBits = (unsigned long long)threadIdx.x << (0);
 	unsigned long long gridXBits = (unsigned long long)(blockIdx.x) << (10);
 	unsigned long long gridYBits = (unsigned long long)(blockIdx.y) << (31 + 10); //arch specific, need to pass the max values
 	unsigned long long thread_id = gridXBits | gridYBits | threadXBits;
-	
+
 	int local_id = -1;
 	if (thread_id < n)
 		local_id = (int)thread_id;
 	else
 		return;
-	
+
 	b[local_id] = a[local_id];
 	c[local_id] = a[local_id];
+	d[local_id] = 0;
 	//max-prefix - 
-	for (int r = 0; r <= log2((float)(n - 1)); r++)
+	for (int r = 0; r <= log2((float)(n)); r++)
 	{
-		bool sorted = true;
-		for (int i = 1; i < n; i++)
-		{
-
-			if (b[i] < b[i - 1])
-				sorted = false;
-		}
-		if (sorted == true)
+		*sorted = true;
+		devCheckIfSorted(b, n, local_id, sorted);
+		if (*sorted == true)
 		{
 			break;
 		}
@@ -75,47 +72,43 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 		}
 	}
 	//min-prefix
-	for (int r = 0; r <= log2((float)(n - 1)); r++)
+	for (int r = 0; r <= log2((float)(n)); r++)
 	{
-		bool sorted = true;
-		for (int i = 1; i < n; i++)
-		{
-
-			if (c[i] < c[i - 1])
-				sorted = false;
-		}
-		if (sorted == true)
+		*sorted = true;
+		devCheckIfSorted(c, n, local_id, sorted);
+		if (*sorted == true)
 		{
 			break;
 		}
-		else if (local_id - exp2((float)r) >= 0)
+		else if (local_id + exp2((float)r) < n)
 		{
-			int idx = local_id - exp2((float)r);
+			int idx = local_id + exp2((float)r);
 			c[local_id] = min(c[local_id], c[idx]);
 		}
 	}
 	
-	bool isSet = false; //StackOverflow -- https://stackoverflow.com/questions/21341495/cuda-mutex-and-atomiccas
-	do {
+	__syncthreads();
 
-		if (isSet = atomicCAS(r, 0, 1) == 0)
-		{
-			int i = n - 1;
-			while ((local_id <= i) && (i >= 0) && c[i] <= b[local_id] && ((local_id == 0) || (c[i] >= b[local_id - 1])))
-			{
-				d[i] = i - local_id;
-				i--;
-			}
+	int i = local_id;
+	for (int j = n - 1; j >= 0; j--) {
+		if (j <= i && i >= 0 && c[i] <= b[j] &&
+			(j == 0 || c[i] >= b[j - 1])) {
+			d[i] = i - j;
 		}
-		if (isSet)
-		{
-			*r = 0;
-		}
-	} while (!isSet);
+	}
+
 	//use thrust maxelement to find max of d, which is k
 	
 	*k = *(thrust::max_element(thrust::device, &d[0], &d[n]));
 	
+
+}
+
+__device__ void devCheckIfSorted(int32_t* a, int n, int local_id, bool * sorted)
+{
+
+	if (a[local_id] > a[max(local_id + 1, n - 1)])
+		*sorted = false;
 
 }
 
@@ -159,12 +152,15 @@ void devCheckSortedness(int32_t* const a, const int n)
 	int * d = (int*)cuMalloc(sizeof(int) * n);
 	int * r = (int*)cuMalloc(sizeof(int));
 	int * k = (int*)cuMalloc(sizeof(int));
-	
+	bool * sorted = (bool*)cuMalloc(sizeof(bool));
+
 	int r_host = 0;
+	int sorted_host = false;
 
 	cudaMemcpy(r, &r_host, 1, cudaMemcpyHostToDevice);
+	cudaMemcpy(sorted, &sorted_host, 1, cudaMemcpyHostToDevice);
 
-	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k, b, c, d, r);
+	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k, b, c, d, r, sorted);
 
 
 	cudaThreadSynchronize();
@@ -178,10 +174,12 @@ void devCheckSortedness(int32_t* const a, const int n)
 	cudaMemcpy(b_host, b, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	cudaMemcpy(c_host, c, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	cudaMemcpy(d_host, d, sizeof(int) * n, cudaMemcpyDeviceToHost);
+	cudaMemcpy(&r_host, r, sizeof(int), cudaMemcpyDeviceToHost);
+
 
 	CHECK(cudaGetLastError());
 	std::cout << "K value: " << k_host << std::endl;
-
+	std::cout << "R value: " << r_host << std::endl;
 	for (int i = 0; i < n; i++)
 	{
 		cout << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << endl;
