@@ -16,5 +16,4 @@ void devQuicksort(int32_t* const a, const int n) {
 
 void devRoughsort(int32_t* const a, const int n) {
   thrust::device_ptr<int32_t> devA(a);
-  // TODO
 }

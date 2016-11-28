@@ -1,18 +1,9 @@
 /* sort.cxx: Sequential pure-CPU sorting routines. */
 
 #include <algorithm>
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
 #include "roughsort.h"
 
-void hostMergesort(int32_t* const a, const int n) {
-  std::stable_sort(a, a + n);
-}
-
-void hostQuicksort(int32_t* const a, const int n) {
-  std::sort(a, a + n);
-}
+namespace {
 
 /* Generates the LR characteristic sequence of the sequence a. */
 void hostLR(const int32_t* const a, int32_t* const b, const int n) {
@@ -41,17 +32,6 @@ void hostDM(const int32_t* const b, const int32_t* const c, int32_t* const d,
       i--;
     }
   }
-}
-
-/* Computes the smallest k for which a is k-sorted (aka the "radius" of a). */
-int hostRough(const int32_t* const d, const int n) {
-  int k = 0;
-  for (int i = 0; i < n; i++) {
-    if (d[i] > k) {
-      k = d[i];
-    }
-  }
-  return k;
 }
 
 void oneSort(int32_t* const a, const int n) {
@@ -113,21 +93,36 @@ void hostHalve(int32_t* const a, const int radius, const int n) {
   std::nth_element(offset, offset + tailMid, end);
 }
 
-typedef void (*halveFunc)(int32_t* const, const int, const int);
+} // end anonymous namespace
 
-/* Sequential roughsort implementation. */
-void hostRoughsort(int32_t* const a, const int n) {
-  int32_t* b = new int[n]; // we never release these
+void hostMergesort(int32_t* const a, const int n) {
+  std::stable_sort(a, a + n);
+}
+
+void hostQuicksort(int32_t* const a, const int n) {
+  std::sort(a, a + n);
+}
+
+/* Computes the smallest k for which a is k-sorted (aka the "radius" of a). */
+int hostRough(const int32_t* const a, const int n) {
+  int32_t* b = new int[n];
   int32_t* c = new int[n];
   int32_t* d = new int[n];
-
   hostLR(a, b, n);
   hostRL(a, c, n);
   hostDM(b, c, d, n);
-  const int radius = hostRough(d, n);
+
+  const int k = *std::max_element(d, d + n);
+
   delete[] b;
   delete[] c;
   delete[] d;
+  return k;
+}
+
+/* Sequential roughsort implementation. */
+void hostRoughsort(int32_t* const a, const int n) {
+  const int radius = hostRough(a, n);
 
   if (!radius || n < 2) {
     return;
@@ -137,6 +132,7 @@ void hostRoughsort(int32_t* const a, const int n) {
     return;
   }
 
+  typedef void (*halveFunc)(int32_t* const, const int, const int);
   halveFunc halve = n%radius ? (halveFunc)hostHalve : (halveFunc)hostHalveEasy;
 
   int k = radius, p = 0;

@@ -14,7 +14,7 @@ extern int optind;
 namespace {
 
 enum {
-  MIN_ARRAY_LEN = 0,
+  MIN_ARRAY_LEN = 2,
   MAX_ARRAY_LEN = (1 << 30) + (1 << 29) + (1 << 28), // ~1.75 bil. ints, 7 GiB
   MIN_RAND_LEN = 1 << 10,
   MAX_RAND_LEN = 1 << 24
@@ -50,6 +50,7 @@ int msSince(timespec* start) {
       "  -g        Skip the sequential, non-GPU algorithms\n"
       "  -k <int>  Set the k-sortedness of the random array (default: don't k-sort)\n"
       "  -n <len>  Set randomized array length (default: random)\n"
+      "  -s        Shuffle each (k + 1)-segment\n"
       "  -t        Confirm sorted array is in order\n");
   exit(1);
 }
@@ -72,10 +73,11 @@ int main(int argc, char* argv[]) {
   bool runHostSorts = true;
   int k = -1;
   int arrayLen = randLen(MIN_RAND_LEN, MAX_RAND_LEN);
+  bool shuffle = false;
   bool testSorted = false;
 
   int option;
-  while ((option = getopt(argc, argv, "hgk:n:t")) != -1) {
+  while ((option = getopt(argc, argv, "hgk:n:st")) != -1) {
     switch (option) {
     case 'h':
       usage();
@@ -91,6 +93,10 @@ int main(int argc, char* argv[]) {
     case 'n':
       arrayLen = (int)parseInt(10, MIN_ARRAY_LEN, MAX_ARRAY_LEN,
                                "invalid unsorted array length");
+      break;
+
+    case 's':
+      shuffle = true;
       break;
 
     case 't':
@@ -117,7 +123,7 @@ int main(int argc, char* argv[]) {
   int32_t* const devSortingArray = (int32_t*)cuMalloc(arraySize);
 
   msg("generating a random array of %d integers...", arrayLen);
-  randArray(hostUnsortedArray, k, arrayLen);
+  randArray(hostUnsortedArray, k, arrayLen, shuffle);
 
   struct {
     const char* name;
@@ -167,7 +173,7 @@ int main(int argc, char* argv[]) {
         if (bench.onGPU) {
           cuDownload(hostSortingArray, devSortingArray, arraySize);
         }
-        if(!testArrayEq(hostSortingArray, hostReferenceArray, arrayLen)) {
+        if (!testArrayEq(hostSortingArray, hostReferenceArray, arrayLen)) {
           resultMsg = " BUT IS BROKEN";
         }
       }

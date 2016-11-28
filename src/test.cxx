@@ -90,23 +90,7 @@ void cmpArrays(void** state, const int32_t* const a, const int32_t* const exp,
 void runRoughTest(void** state, int32_t* const a, int32_t* const lr,
                   int32_t* const rl, int32_t* dm, const int rough,
                   const int n) {
-  int32_t* const b = new int32_t[n];
-  hostLR(a, b, n);
-  cmpArrays(state, b, lr, n);
-
-  int32_t* const c = new int32_t[n];
-  hostRL(a, c, n);
-  cmpArrays(state, c, rl, n);
-
-  int32_t* const d = new int32_t[n];
-  hostDM(b, c, d, n);
-  cmpArrays(state, d, dm, n);
-
-  assert_int_equal(hostRough(d, n), rough);
-
-  delete[] b;
-  delete[] c;
-  delete[] d;
+  assert_int_equal(hostRough(a, n), rough);
 }
 
 void runHostSortTest(void** state, void (*sort)(int32_t* const, const int)) {
@@ -163,7 +147,7 @@ void testDevMemory(void** state) {
   }
 
   auto b = new int32_t[n];
-  randArray(a, -1, n);
+  randArray(a, -1, n, false);
   cuUpload(devA, a, size);
   cuDownload(b, devA, size);
   cmpArrays(state, b, a, n);
