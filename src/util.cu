@@ -7,7 +7,8 @@
 
 inline void cuCheck(cudaError_t r, const char* fname, const size_t lnum) {
   if (r != cudaSuccess) {
-    fatal("CUDA error at line %d in %s\n", lnum, fname);
+    fatal("CUDA error at line %d in %s: %s\n", lnum, fname,
+          cudaGetErrorString(r));
   }
 }
 
