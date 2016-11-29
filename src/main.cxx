@@ -13,24 +13,22 @@ extern int optind;
 
 namespace {
 
-enum {
-  MIN_ARRAY_LEN = 2,
-  MAX_ARRAY_LEN = (1 << 30) + (1 << 29) + (1 << 28), // ~1.75 bil. ints, 7 GiB
-  MIN_RAND_LEN = 1 << 10,
-  MAX_RAND_LEN = 1 << 24
-};
+const int64_t MIN_ARRAY_LEN = 2,
+              MAX_ARRAY_LEN = (1<<30) + (1<<29) + (1<<28), // ~1.75 bil. 7 GiB
+              MIN_RAND_LEN = 1 << 10,
+              MAX_RAND_LEN = 1 << 24;
 
 /* Parses an integer argument of the given radix from the command line, aborting
    after printing errMsg if an error occurs or the integer exceeds the given
    bounds. */
-int parseInt(int radix, int min, int max, const char* errMsg) {
+int parseInt(int radix, int64_t min, int64_t max, const char* errMsg) {
   char* parsePtr = nullptr;
-  int i = strtol(optarg, &parsePtr, radix);
-  if ((size_t)(parsePtr - optarg) != strlen(optarg) || i < min || i > max ||
+  auto l = strtoll(optarg, &parsePtr, radix);
+  if ((size_t)(parsePtr - optarg) != strlen(optarg) || l < min || l > max ||
       ERANGE == errno) {
     fatal(errMsg);
   }
-  return i;
+  return l;
 }
 
 void getTime(timespec* start) {
@@ -127,11 +125,14 @@ int main(int argc, char* argv[]) {
     arrayLen = randLen(MIN_RAND_LEN, MAX_RAND_LEN);
   }
 
-  const auto arraySize = 4*arrayLen;
+  const size_t arraySize = 4*(size_t)arrayLen;
   msg("allocating storage...");
   int32_t* const hostUnsortedArray = new int32_t[arrayLen];
   int32_t* const hostSortingArray  = new int32_t[arrayLen];
   int32_t* hostReferenceArray = nullptr;
+
+  msg("%.3f MiB device RAM available, using %.3f MiB", mibibytes(cuMemAvail()),
+      mibibytes(arraySize));
   int32_t* const devSortingArray = (int32_t*)cuMalloc(arraySize);
 
   msg("generating a random array of %d integers...", arrayLen);
