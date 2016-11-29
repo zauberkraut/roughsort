@@ -44,7 +44,7 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 	unsigned long long threadXBits = (unsigned long long)threadIdx.x;
 	unsigned long long gridXBits = (unsigned long long)(blockIdx.x) << tpbBits;
 	unsigned long long gridYBits = (unsigned long long)(blockIdx.y) << tpbBits;
-	gridYBits = gridYBits << g0Bits; //arch specific, need to pass the max values
+	gridYBits = gridYBits << g0Bits;
 	unsigned long long thread_id = gridXBits | gridYBits | threadXBits;
 
 	int local_id = -1;
@@ -53,8 +53,8 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 	else
 		return;
 
-	if(local_id == 0)
-		atomicAdd(r, tpbBits + g0Bits);
+	//if(local_id == 0)
+	//	atomicAdd(r, tpbBits + g0Bits);
 
 	b[local_id] = a[local_id];
 	c[local_id] = a[local_id];
@@ -126,26 +126,26 @@ void devCheckSortedness(int32_t* const a, const int n)
 	unsigned long long max = n;
 	unsigned long long threadblockX = max / deviceProp.maxThreadsPerBlock > 1 ? deviceProp.maxThreadsPerBlock : max;
 	threadblockX = threadblockX == 0 ? 1 : threadblockX;
-	std::cout << "Thread block X: " << threadblockX << std::endl;
-	std::cout << "Max block X: " << deviceProp.maxThreadsPerBlock << std::endl;
+	//std::cout << "Thread block X: " << threadblockX << std::endl;
+	//std::cout << "Max block X: " << deviceProp.maxThreadsPerBlock << std::endl;
 
 	unsigned long long threadblockY = 1;
-	std::cout << "Thread block Y: " << threadblockY << std::endl;
+	//std::cout << "Thread block Y: " << threadblockY << std::endl;
 
 	unsigned long long threadblockZ = 1;
-	std::cout << "Thread block Z: " << threadblockZ << std::endl;
+	//std::cout << "Thread block Z: " << threadblockZ << std::endl;
 
 	//calculates required grid X dimension based on the dimension available on device
 	unsigned long long gridX = max / (deviceProp.maxGridSize[0]) / threadblockX / threadblockY / threadblockZ > 1 ? deviceProp.maxGridSize[0] : max / threadblockX / threadblockY / threadblockZ + (max % (threadblockX * threadblockY * threadblockZ) > 0 ? 1 : 0);
 	gridX = gridX == 0 ? 1 : gridX;
-	std::cout << "Grid X: " << gridX << std::endl;
-	std::cout << "Max Grid X: " << deviceProp.maxGridSize[0] << std::endl;
+	//std::cout << "Grid X: " << gridX << std::endl;
+	//std::cout << "Max Grid X: " << deviceProp.maxGridSize[0] << std::endl;
 
 	//calculates required grid Y dimension based on the dimension available on device
 	unsigned long long gridY = max / threadblockX / threadblockY / threadblockZ / gridX / deviceProp.maxGridSize[1] > 1 ? deviceProp.maxGridSize[1] : max / threadblockX / threadblockY / threadblockZ / gridX + (max % (threadblockX * threadblockY * threadblockZ * gridX) > 0 ? 1 : 0);
 	gridY = gridY == 0 ? 1 : gridY;
-	std::cout << "Grid Y: " << gridY << std::endl;
-	std::cout << "Max Grid Y: " << deviceProp.maxGridSize[1] << std::endl;
+	//std::cout << "Grid Y: " << gridY << std::endl;
+	//std::cout << "Max Grid Y: " << deviceProp.maxGridSize[1] << std::endl;
 
 	dim3 dimBlock(threadblockX, threadblockY, threadblockZ);
 	dim3 dimGrid(gridX, gridY, 1);
@@ -156,14 +156,12 @@ void devCheckSortedness(int32_t* const a, const int n)
 	int * r = (int*)cuMalloc(sizeof(int));
 	int * k = (int*)cuMalloc(sizeof(int));
 	bool * sorted = (bool*)cuMalloc(sizeof(bool));
-	cudaDeviceProp * devProp = (cudaDeviceProp *)cuMalloc(sizeof(cudaDeviceProp));
 
 	int r_host = 0;
 	int sorted_host = false;
 
 	cudaMemcpy(r, &r_host, 1, cudaMemcpyHostToDevice);
 	cudaMemcpy(sorted, &sorted_host, 1, cudaMemcpyHostToDevice);
-	cudaMemcpy(devProp, &deviceProp, 1, cudaMemcpyHostToDevice);
 	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k, b, c, d, r, sorted, log2(deviceProp.maxThreadsPerBlock), log2(deviceProp.maxGridSize[0]), log2(deviceProp.maxGridSize[1]));
 
 	cudaThreadSynchronize();
@@ -182,13 +180,13 @@ void devCheckSortedness(int32_t* const a, const int n)
 
 	CHECK(cudaGetLastError());
 	std::cout << "K value: " << k_host << std::endl;
-	std::cout << "R value: " << r_host << std::endl;
+	//std::cout << "R value: " << r_host << std::endl;
 	
-	if(n<=256)
+	/*if(n<=256)
 	for (int i = 0; i < n; i++)
 	{
 		cout << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << endl;
-	}
+	}*/
 	
 	cuFree(b);
 	CHECK(cudaGetLastError());
@@ -200,7 +198,8 @@ void devCheckSortedness(int32_t* const a, const int n)
 	CHECK(cudaGetLastError());
 	cuFree(k);
 	CHECK(cudaGetLastError());
-
+	cuFree(sorted);
+	CHECK(cudaGetLastError());
 
 }
 
