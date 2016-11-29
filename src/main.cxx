@@ -149,7 +149,7 @@ int main(int argc, char* argv[]) {
     {"CPU Roughsort", hostRoughsort, runHostSorts, false},
     {"GPU Mergesort", devMergesort,  true, true},
     {"GPU Quicksort", devQuicksort,  true, true},
-    {"GPU Roughsort", devRoughsort,  false, true}
+    {"GPU Roughsort", devRoughsort,  true, true}
   };
 
   msg("running sort algorithm benchmarks...");

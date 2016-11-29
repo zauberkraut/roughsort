@@ -17,6 +17,7 @@ void devQuicksort(int32_t* const a, const int n) {
 
 void devRoughsort(int32_t* const a, const int n) {
   thrust::device_ptr<int32_t> devA(a);
+  msg("CUDA radius is %d", devRough(a, n));
 }
 
 static __global__ void kernRough(const int32_t* const a, const int n,
@@ -54,9 +55,10 @@ static __global__ void kernRough(const int32_t* const a, const int n,
   __syncthreads();
 
   int dist = 0;
-  for (int j = id; j >= 0; j--) { // cur = c[id]
+  for (int j = id - 1; j >= 0; j--) { // cur = c[id]
     if (cur <= b[j] && (j == 0 || cur >= b[j - 1])) {
       dist = id - j;
+      break;
     }
   }
 

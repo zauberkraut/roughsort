@@ -27,7 +27,7 @@ void hostDM(const int32_t* const b, const int32_t* const c, int32_t* const d,
   int i = n - 1;
   for (int j = n-1; j >= 0; j--) {
     while (j <= i && i >= 0 && c[i] <= b[j] &&
-         (j == 0 || c[i] >= b[j-1])) {
+           (j == 0 || c[i] >= b[j-1])) {
       d[i] = i - j;
       i--;
     }
