@@ -186,7 +186,7 @@ void testDevRoughsort(void** state) {
 } // end anonymous namespace
 
 int main() {
-  randInit();
+  randInit(false);
 
   const struct CMUnitTest tests[] = {
     cmocka_unit_test(testDevMemory),

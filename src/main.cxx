@@ -49,6 +49,7 @@ int msSince(timespec* start) {
       "  -h        These instructions\n"
       "  -g        Skip the sequential, non-GPU algorithms\n"
       "  -k <int>  Set the k-sortedness of the random array (default: don't k-sort)\n"
+      "  -m        Force usage of software Mersenne Twister RNG\n"
       "  -n <len>  Set randomized array length (default: random)\n"
       "  -s        Shuffle each (k + 1)-segment\n"
       "  -t        Confirm sorted array is in order\n");
@@ -68,16 +69,16 @@ bool testArrayEq(const int32_t* const a, const int32_t* const b, const int n) {
 
 int main(int argc, char* argv[]) {
   msg("Roughsort Demonstration\nA. Pfaff, J. Treadwell 2016\n");
-  randInit();
 
   bool runHostSorts = true;
   int k = -1;
-  int arrayLen = randLen(MIN_RAND_LEN, MAX_RAND_LEN);
+  bool forceMT = false;
+  int arrayLen = 0;
   bool shuffle = false;
   bool testSorted = false;
 
   int option;
-  while ((option = getopt(argc, argv, "hgk:n:st")) != -1) {
+  while ((option = getopt(argc, argv, "hgk:mn:st")) != -1) {
     switch (option) {
     case 'h':
       usage();
@@ -90,12 +91,18 @@ int main(int argc, char* argv[]) {
       k = (int)parseInt(10, 0, MAX_ARRAY_LEN, "invalid k-sortedness");
       break;
 
+    case 'm':
+      msg("forcing usage of software RNG");
+      forceMT = true;
+      break;
+
     case 'n':
       arrayLen = (int)parseInt(10, MIN_ARRAY_LEN, MAX_ARRAY_LEN,
                                "invalid unsorted array length");
       break;
 
     case 's':
+      msg("random array shuffling enabled");
       shuffle = true;
       break;
 
@@ -113,6 +120,11 @@ int main(int argc, char* argv[]) {
   }
   if (k >= arrayLen) {
     fatal("an array of length %d can't be %d-sorted!", arrayLen, k);
+  }
+
+  randInit(forceMT);
+  if (!arrayLen) {
+    arrayLen = randLen(MIN_RAND_LEN, MAX_RAND_LEN);
   }
 
   const auto arraySize = 4*arrayLen;

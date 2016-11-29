@@ -100,8 +100,8 @@ void kShuffle(int32_t* const a, const int k, const int n) {
 } // end anonymous namespace
 
 /* Selects general-purpose RNG and seeds it if necessary. */
-void randInit() {
-  if (rdRandSupported()) {
+void randInit(bool forceMT) {
+  if (rdRandSupported() && !forceMT) {
     randInt = rdRand;
   } else { // fall back on the C++ MT generator and seed it
     warn("Your CPU is old and an embarrassment; falling back on mt19937");
@@ -138,11 +138,11 @@ void randArray(int32_t* const a, const int k, const int n, bool shuffle) {
     if (k > 0) {
       shuffle ? kShuffle(a, k, n) : kPerturb(a, k, n);
     }
+  }
 
-    const int radius = hostRough(a, n);
-    printf("random array is %d-sorted\n", radius);
-    if (radius != k) {
-      fatal("...but we needed it %d-sorted!", k);
-    }
+  const int radius = hostRough(a, n);
+  printf("random array is %d-sorted\n", radius);
+  if (radius != k && k > -1) {
+    fatal("...but we needed it %d-sorted!", k);
   }
 }

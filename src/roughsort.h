@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-void randInit();
+void randInit(bool forceMT);
 int randLen(int min, int max);
 void randArray(int32_t* const a, const int k, const int n, bool shuffle);
 
