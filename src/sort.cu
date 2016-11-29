@@ -75,7 +75,7 @@ int devRough(const int32_t* const a, const int n) {
   kernRough<<<nBlocks, nThreadsPerBlock>>>(a, n, b, c, d);
 
   cudaDeviceSynchronize();
-  thrust::device_ptr<int32_t> thrustD(d);
+  thrust::device_ptr<int> thrustD(d);
   const int k = *thrust::max_element(thrustD, thrustD + n);
 
   cuFree(b);
