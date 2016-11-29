@@ -38,13 +38,13 @@ void devRoughsort(int32_t* const a, const int n)
 }
 
 
-__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r, bool * sorted)
+__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r, bool * sorted, int tpbBits, int g0Bits, int g1Bits)
 {
 
-
-	unsigned long long threadXBits = (unsigned long long)threadIdx.x << (0);
-	unsigned long long gridXBits = (unsigned long long)(blockIdx.x) << (10);
-	unsigned long long gridYBits = (unsigned long long)(blockIdx.y) << (31 + 10); //arch specific, need to pass the max values
+	unsigned long long threadXBits = (unsigned long long)threadIdx.x;
+	unsigned long long gridXBits = (unsigned long long)(blockIdx.x) << tpbBits;
+	unsigned long long gridYBits = (unsigned long long)(blockIdx.y) << tpbBits;
+	gridYBits = gridYBits << g0Bits; //arch specific, need to pass the max values
 	unsigned long long thread_id = gridXBits | gridYBits | threadXBits;
 
 	int local_id = -1;
@@ -52,6 +52,9 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 		local_id = (int)thread_id;
 	else
 		return;
+
+	if(local_id == 0)
+		atomicAdd(r, tpbBits + g0Bits);
 
 	b[local_id] = a[local_id];
 	c[local_id] = a[local_id];
@@ -153,15 +156,15 @@ void devCheckSortedness(int32_t* const a, const int n)
 	int * r = (int*)cuMalloc(sizeof(int));
 	int * k = (int*)cuMalloc(sizeof(int));
 	bool * sorted = (bool*)cuMalloc(sizeof(bool));
+	cudaDeviceProp * devProp = (cudaDeviceProp *)cuMalloc(sizeof(cudaDeviceProp));
 
 	int r_host = 0;
 	int sorted_host = false;
 
 	cudaMemcpy(r, &r_host, 1, cudaMemcpyHostToDevice);
 	cudaMemcpy(sorted, &sorted_host, 1, cudaMemcpyHostToDevice);
-
-	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k, b, c, d, r, sorted);
-
+	cudaMemcpy(devProp, &deviceProp, 1, cudaMemcpyHostToDevice);
+	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k, b, c, d, r, sorted, log2(deviceProp.maxThreadsPerBlock), log2(deviceProp.maxGridSize[0]), log2(deviceProp.maxGridSize[1]));
 
 	cudaThreadSynchronize();
 	cudaDeviceSynchronize();
@@ -180,6 +183,8 @@ void devCheckSortedness(int32_t* const a, const int n)
 	CHECK(cudaGetLastError());
 	std::cout << "K value: " << k_host << std::endl;
 	std::cout << "R value: " << r_host << std::endl;
+	
+	if(n<=256)
 	for (int i = 0; i < n; i++)
 	{
 		cout << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << endl;
