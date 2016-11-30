@@ -20,6 +20,8 @@ void devRoughsort(int32_t* const a, const int n) {
   msg("CUDA radius is %d", devRough(a, n));
 }
 
+static __device__ bool isSorted;
+
 static __global__ void kernRough(const int32_t* const a, const int n,
                                  int32_t* const b, int32_t* const c,
                                  int* const d) {
@@ -29,36 +31,48 @@ static __global__ void kernRough(const int32_t* const a, const int n,
   }
   const int logn = 31 - __clz(n);
 
-  int32_t cur = b[id] = c[id] = a[id];
+  b[id] = c[id] = a[id];
+
   // max prefix
-  int32_t end = b[n - 1];
-  for (int r = 0; cur > end && r <= logn; r++) {
-    const int j = id - (1 << r);
-    if (j < 0) {
+  for (int r = 0; r <= logn; r++) {
+    isSorted = true;
+    if (b[id] > b[n - 1]) {
+      isSorted = false;
+    }
+    if (isSorted) {
       break;
     }
-    cur = b[id] = max(cur, b[j]);
+
+    const int j = id - (1 << r);
+    if (j >= 0) {
+      b[id] = max(b[id], b[j]);
+    }
   }
 
   __syncthreads();
 
   // min prefix
-  end = c[n - 1];
-  for (int r = 0; cur > end && r <= logn; r++) {
-    const int j = id + (1 << r);
-    if (j >= n) {
+  for (int r = 0; r <= logn; r++) {
+    isSorted = true;
+    if (c[id] > c[n - 1]) {
+      isSorted = false;
+    }
+    if (isSorted) {
       break;
     }
-    cur = c[id] = min(cur, c[j]);
+
+    const int j = id + (1 << r);
+    if (j < n) {
+      c[id] = min(c[id], c[j]);
+    }
   }
 
   __syncthreads();
 
   int dist = 0;
-  for (int j = id - 1; j >= 0; j--) { // cur = c[id]
-    if (cur <= b[j] && (j == 0 || cur >= b[j - 1])) {
+  for (int j = id - 1; j >= 0; j--) {
+    if (c[id] <= b[j] && (j == 0 || c[id] >= b[j - 1])) {
       dist = id - j;
-      break;
     }
   }
 
