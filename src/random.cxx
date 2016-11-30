@@ -133,7 +133,7 @@ void randArray(int32_t* const a, const int k, const int n, bool shuffle) {
   }
 
   if (k >= 0) {
-    hostMergesort(a, n);
+    hostQuicksort(a, n);
 
     if (k > 0) {
       shuffle ? kShuffle(a, k, n) : kPerturb(a, k, n);

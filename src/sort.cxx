@@ -95,10 +95,6 @@ void hostHalve(int32_t* const a, const int radius, const int n) {
 
 } // end anonymous namespace
 
-void hostMergesort(int32_t* const a, const int n) {
-  std::stable_sort(a, a + n);
-}
-
 void hostQuicksort(int32_t* const a, const int n) {
   std::sort(a, a + n);
 }

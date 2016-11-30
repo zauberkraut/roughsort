@@ -13,7 +13,7 @@ modules = $(build)/random.o $(build)/sort.o $(build)/sort.obj \
           $(build)/util.o $(build)/util.obj
 tests = $(build)/test.o
 
-oflags = -O4
+oflags = -O3
 wflags = -Wall -Werror
 # note GCC RDRAND flag "-mrdrnd"
 cflags = -std c++11 $(oflags) -Xcompiler "-mrdrnd $(wflags)"

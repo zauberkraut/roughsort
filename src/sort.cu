@@ -73,6 +73,7 @@ static __global__ void kernRough(const int32_t* const a, const int n,
   for (int j = id - 1; j >= 0; j--) {
     if (c[id] <= b[j] && (j == 0 || c[id] >= b[j - 1])) {
       dist = id - j;
+      break;
     }
   }
 

@@ -138,18 +138,18 @@ int main(int argc, char* argv[]) {
   msg("generating a random array of %d integers...", arrayLen);
   randArray(hostUnsortedArray, k, arrayLen, shuffle);
 
+  const bool runDevSorts = true;
+
   struct {
     const char* name;
     void (*sort)(int32_t* const, const int);
     bool runTest;
     bool onGPU;
   } benchmarks[] = {
-    {"CPU Mergesort", hostMergesort, runHostSorts, false},
     {"CPU Quicksort", hostQuicksort, runHostSorts, false},
     {"CPU Roughsort", hostRoughsort, runHostSorts, false},
-    {"GPU Mergesort", devMergesort,  true, true},
-    {"GPU Quicksort", devQuicksort,  true, true},
-    {"GPU Roughsort", devRoughsort,  true, true}
+    {"GPU Radixsort", devQuicksort,  runDevSorts, true},
+    {"GPU Roughsort", devRoughsort,  runDevSorts, true}
   };
 
   msg("running sort algorithm benchmarks...");

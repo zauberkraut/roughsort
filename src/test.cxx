@@ -164,20 +164,14 @@ void testHostRough(void** state) {
                ALEN(g_test22));
 }
 
-void testHostMergesort(void** state) {
-  runHostSortTest(state, hostMergesort);
-}
 void testHostQuicksort(void** state) {
   runHostSortTest(state, hostQuicksort);
 }
 void testHostRoughsort(void** state) {
   runHostSortTest(state, hostRoughsort);
 }
-void testDevMergesort(void** state) {
-  runDevSortTest(state, devMergesort);
-}
 void testDevQuicksort(void** state) {
-  runDevSortTest(state, devMergesort);
+  runDevSortTest(state, devQuicksort);
 }
 void testDevRoughsort(void** state) {
   runDevSortTest(state, devRoughsort);
@@ -191,10 +185,8 @@ int main() {
   const struct CMUnitTest tests[] = {
     cmocka_unit_test(testDevMemory),
     cmocka_unit_test(testHostRough),
-    cmocka_unit_test(testHostMergesort),
     cmocka_unit_test(testHostQuicksort),
     cmocka_unit_test(testHostRoughsort),
-    cmocka_unit_test(testDevMergesort),
     cmocka_unit_test(testDevQuicksort),
     cmocka_unit_test(testDevRoughsort),
   };
