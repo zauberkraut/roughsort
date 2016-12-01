@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <functional>
 #include <unistd.h>
 #include "roughsort.h"
 
@@ -136,21 +137,26 @@ int main(int argc, char* argv[]) {
   int32_t* const devSortingArray = (int32_t*)cuMalloc(arraySize);
 
   msg("generating a random array of %d integers...", arrayLen);
-  randArray(hostUnsortedArray, k, arrayLen, shuffle);
+  const int radius = randArray(hostUnsortedArray, k, arrayLen, shuffle);
+
+  auto wrapDevRoughsort = [radius](int32_t* const a, const int n) {
+    devRoughsort(a, radius, n);
+  };
 
   const bool runDevSorts = true;
 
   struct {
     const char* name;
-    void (*sort)(int32_t* const, const int);
+    std::function<void(int32_t* const, const int)> sort;
+//    void (*sort)(int32_t* const, const int);
     bool runTest;
     bool onGPU;
   } benchmarks[] = {
-    {"CPU Quicksort", hostQuicksort, runHostSorts, false},
-    {"CPU Roughsort", hostRoughsort, runHostSorts, false},
-    {"GPU Mergesort", devMergesort,  runDevSorts, true},
-    {"GPU Radixsort", devRadixsort,  runDevSorts, true},
-    {"GPU Roughsort", devRoughsort,  runDevSorts, true}
+    {"CPU Quicksort", hostQuicksort,    runHostSorts, false},
+    {"CPU Roughsort", hostRoughsort,    runHostSorts, false},
+    {"GPU Mergesort", devMergesort,     runDevSorts,  true},
+    {"GPU Radixsort", devRadixsort,     runDevSorts,  true},
+    {"GPU Roughsort", wrapDevRoughsort, runDevSorts,  true}
   };
 
   msg("running sort algorithm benchmarks...");

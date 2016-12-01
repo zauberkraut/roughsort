@@ -5,7 +5,7 @@
 
 void randInit(bool forceMT);
 int randLen(int min, int max);
-void randArray(int32_t* const a, const int k, const int n, bool shuffle);
+int randArray(int32_t* const a, const int k, const int n, bool shuffle);
 
 void hostQuicksort(int32_t* const a, const int n);
 int hostRadius(const int32_t* const a, const int n);
@@ -13,7 +13,7 @@ void hostRoughsort(int32_t* const a, const int n);
 
 void devMergesort(int32_t* const a, const int n);
 void devRadixsort(int32_t* const a, const int n);
-void devRoughsort(int32_t* const a, const int n);
+void devRoughsort(int32_t* const a, const int radius, const int n);
 
 void msg(const char* s, ...);
 void warn(const char* s, ...);

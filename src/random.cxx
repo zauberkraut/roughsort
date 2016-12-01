@@ -121,7 +121,7 @@ void randRun(int thId, int32_t* a, int n) {
 }
 
 /* Randomizes an integer array with distinct 32-bit elements. Assumes k < n. */
-void randArray(int32_t* const a, const int k, const int n, bool shuffle) {
+int randArray(int32_t* const a, const int k, const int n, bool shuffle) {
   std::thread runs[NTHREADS];
 
   for (int i = 0; i < NTHREADS; i++) {
@@ -145,4 +145,6 @@ void randArray(int32_t* const a, const int k, const int n, bool shuffle) {
   if (radius != k && k > -1) {
     fatal("...but we needed it %d-sorted!", k);
   }
+
+  return radius;
 }

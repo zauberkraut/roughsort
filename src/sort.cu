@@ -3,7 +3,10 @@
 #include <thrust/device_ptr.h>
 #include <thrust/extrema.h>
 #include <thrust/sort.h>
+#include <thrust/system/cuda/execution_policy.h>
 #include "roughsort.h"
+
+const int NSTREAMS = 64;
 
 template<typename T>
 class forceMergesort : thrust::binary_function<T, T, bool> {
@@ -23,6 +26,7 @@ void devRadixsort(int32_t* const a, const int n) {
   thrust::sort(devA, devA + n);
 }
 
+/*
 static __device__ bool isSorted;
 
 static __global__ void kernRadius(const int32_t* const a, const int n,
@@ -84,7 +88,7 @@ static __global__ void kernRadius(const int32_t* const a, const int n,
   d[id] = dist;
 }
 
-int devRadius(const int32_t* const a, const int n) {
+static int devRadius(const int32_t* const a, const int n) {
   const int nThreadsPerBlock = 1024;
   const int nBlocks = (n + nThreadsPerBlock - 1)/nThreadsPerBlock;
 
@@ -103,7 +107,69 @@ int devRadius(const int32_t* const a, const int n) {
 
   return k;
 }
+*/
 
-void devRoughsort(int32_t* const a, const int n) {
-  msg("CUDA radius is %d", devRadius(a, n));
+/* Produces a (k - 1)/2-sorted sequence from a k-sorted one. */
+static void devHalve(thrust::device_ptr<int32_t> a, const int radius,
+                     const int n, cudaStream_t* streams) {
+  thrust::device_ptr<int32_t> end = a + n;
+  const int tailLen = n%radius;
+  thrust::device_ptr<int32_t> endSeg = end - tailLen - radius;
+
+  thrust::device_ptr<int32_t> offset;
+  int seg;
+
+  for (offset = a, seg = 0; offset <= endSeg;
+       offset += radius, seg = (seg + 1)%NSTREAMS) {
+    thrust::sort(thrust::cuda::par.on(streams[seg]), offset, offset + radius);
+  }
+  if (tailLen) {
+    thrust::sort(thrust::cuda::par.on(streams[seg]), offset, end);
+  }
+
+  cudaDeviceSynchronize();
+  for (offset = a + (radius>>1), seg = 0; offset <= endSeg;
+       offset += radius, seg = (seg + 1)%NSTREAMS) {
+    thrust::sort(thrust::cuda::par.on(streams[seg]), offset, offset + radius);
+  }
+  if (tailLen) {
+    thrust::sort(thrust::cuda::par.on(streams[seg]), offset, end);
+  }
+
+  cudaDeviceSynchronize();
+  for (offset = a, seg = 0; offset <= endSeg;
+       offset += radius, seg = (seg + 1)%NSTREAMS) {
+    thrust::sort(thrust::cuda::par.on(streams[seg]), offset, offset + radius);
+  }
+  if (tailLen) {
+    thrust::sort(thrust::cuda::par.on(streams[seg]), offset, end);
+  }
+}
+
+/* Parallel roughsort implementation.
+   ASSUMES k > 1 */
+void devRoughsort(int32_t* const a, const int radius, const int n) {
+  thrust::device_ptr<int32_t> devA(a);
+  cudaStream_t* streams = new cudaStream_t[NSTREAMS];
+
+  for (int i = 0; i < NSTREAMS; i++) {
+    cudaStreamCreate(streams + i);
+  }
+
+  if (!radius || n < 2) {
+    return;
+  }
+
+  int k = radius, p = 0;
+  do {
+    devHalve(devA, k, n, streams);
+    k = radius / (2 << p++);
+  } while (k > 1);
+
+  for (int i = 0; i < NSTREAMS; i++) {
+    cudaStreamSynchronize(streams[i]);
+    cudaStreamDestroy(streams[i]);
+  }
+
+  delete[] streams;
 }
