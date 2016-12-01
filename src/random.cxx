@@ -140,7 +140,7 @@ void randArray(int32_t* const a, const int k, const int n, bool shuffle) {
     }
   }
 
-  const int radius = hostRough(a, n);
+  const int radius = hostRadius(a, n);
   printf("random array is %d-sorted\n", radius);
   if (radius != k && k > -1) {
     fatal("...but we needed it %d-sorted!", k);

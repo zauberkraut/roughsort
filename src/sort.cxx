@@ -5,7 +5,7 @@
 
 namespace {
 
-/* Generates the LR characteristic sequence of the sequence a. */
+/* Generates the LR characteristic sequence of the array a. */
 void hostLR(const int32_t* const a, int32_t* const b, const int n) {
   b[0] = a[0];
   for (int i = 1; i < n; i++) {
@@ -13,7 +13,7 @@ void hostLR(const int32_t* const a, int32_t* const b, const int n) {
   }
 }
 
-/* Generates the RL characteristic sequence of the sequence a. */
+/* Generates the RL characteristic sequence of the array a. */
 void hostRL(const int32_t* const a, int32_t* const c, const int n) {
   c[n-1] = a[n-1];
   for (int i = n-2; i >= 0; i--) {
@@ -21,17 +21,21 @@ void hostRL(const int32_t* const a, int32_t* const c, const int n) {
   }
 }
 
-/* Generates the disorder measure sequence of the sequence a from above. */
-void hostDM(const int32_t* const b, const int32_t* const c, int32_t* const d,
-             const int n) {
+/* Generates the disorder measure sequence of the array a and returns its
+   radius. */
+int hostDM(const int32_t* const b, const int32_t* const c, const int n) {
+  int radius = 0;
+
   int i = n - 1;
   for (int j = n-1; j >= 0; j--) {
     while (j <= i && i >= 0 && c[i] <= b[j] &&
            (j == 0 || c[i] >= b[j-1])) {
-      d[i] = i - j;
+      radius = std::max(radius, i - j);
       i--;
     }
   }
+
+  return radius;
 }
 
 void oneSort(int32_t* const a, const int n) {
@@ -100,25 +104,23 @@ void hostQuicksort(int32_t* const a, const int n) {
 }
 
 /* Computes the smallest k for which a is k-sorted (aka the "radius" of a). */
-int hostRough(const int32_t* const a, const int n) {
+int hostRadius(const int32_t* const a, const int n) {
   int32_t* b = new int[n];
   int32_t* c = new int[n];
-  int32_t* d = new int[n];
   hostLR(a, b, n);
   hostRL(a, c, n);
-  hostDM(b, c, d, n);
+  hostDM(b, c, n);
 
-  const int k = *std::max_element(d, d + n);
+  const int k = hostDM(b, c, n);
 
   delete[] b;
   delete[] c;
-  delete[] d;
   return k;
 }
 
 /* Sequential roughsort implementation. */
 void hostRoughsort(int32_t* const a, const int n) {
-  const int radius = hostRough(a, n);
+  const int radius = hostRadius(a, n);
 
   if (!radius || n < 2) {
     return;

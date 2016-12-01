@@ -51,7 +51,7 @@ int32_t g_test0[]  = {},
                         15, 17, 18, 18, 18, 19, 19, 19},
         g_test22DM[] = {0, 1, 2, 3, 3, 4, 0, 0, 1, 2, 3, 4, 5, 0, 1, 0, 1,
                         0, 0, 0, 1, 2, 3, 4};
-const int g_testRough = 5;
+const int g_testRadius = 5;
 
 #define ALEN(a) (sizeof(a) / sizeof(*a))
 #define ATEST(a) {a, ALEN(a)}
@@ -90,7 +90,7 @@ void cmpArrays(void** state, const int32_t* const a, const int32_t* const exp,
 void runRoughTest(void** state, int32_t* const a, int32_t* const lr,
                   int32_t* const rl, int32_t* dm, const int rough,
                   const int n) {
-  assert_int_equal(hostRough(a, n), rough);
+  assert_int_equal(hostRadius(a, n), rough);
 }
 
 void runHostSortTest(void** state, void (*sort)(int32_t* const, const int)) {
@@ -158,10 +158,10 @@ void testDevMemory(void** state) {
 }
 
 void testHostRough(void** state) {
-  runRoughTest(state, g_test21, g_test21LR, g_test21RL, g_test21DM, g_testRough,
-               ALEN(g_test21));
-  runRoughTest(state, g_test22, g_test22LR, g_test22RL, g_test22DM, g_testRough,
-               ALEN(g_test22));
+  runRoughTest(state, g_test21, g_test21LR, g_test21RL, g_test21DM,
+               g_testRadius, ALEN(g_test21));
+  runRoughTest(state, g_test22, g_test22LR, g_test22RL, g_test22DM,
+               g_testRadius, ALEN(g_test22));
 }
 
 void testHostQuicksort(void** state) {
@@ -170,8 +170,11 @@ void testHostQuicksort(void** state) {
 void testHostRoughsort(void** state) {
   runHostSortTest(state, hostRoughsort);
 }
-void testDevQuicksort(void** state) {
-  runDevSortTest(state, devQuicksort);
+void testDevMergesort(void** state) {
+  runDevSortTest(state, devMergesort);
+}
+void testDevRadixsort(void** state) {
+  runDevSortTest(state, devRadixsort);
 }
 void testDevRoughsort(void** state) {
   runDevSortTest(state, devRoughsort);
@@ -187,7 +190,8 @@ int main() {
     cmocka_unit_test(testHostRough),
     cmocka_unit_test(testHostQuicksort),
     cmocka_unit_test(testHostRoughsort),
-    cmocka_unit_test(testDevQuicksort),
+    cmocka_unit_test(testDevMergesort),
+    cmocka_unit_test(testDevRadixsort),
     cmocka_unit_test(testDevRoughsort),
   };
 

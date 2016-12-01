@@ -5,26 +5,29 @@
 #include <thrust/sort.h>
 #include "roughsort.h"
 
+template<typename T>
+class forceMergesort : thrust::binary_function<T, T, bool> {
+public:
+  __device__ bool operator()(const T& a, const T& b) const {
+    return a < b;
+  }
+};
+
 void devMergesort(int32_t* const a, const int n) {
   thrust::device_ptr<int32_t> devA(a);
-  thrust::stable_sort(devA, devA + n);
+  thrust::sort(devA, devA + n, forceMergesort<int32_t>());
 }
 
-void devQuicksort(int32_t* const a, const int n) {
+void devRadixsort(int32_t* const a, const int n) {
   thrust::device_ptr<int32_t> devA(a);
   thrust::sort(devA, devA + n);
 }
 
-void devRoughsort(int32_t* const a, const int n) {
-  thrust::device_ptr<int32_t> devA(a);
-  msg("CUDA radius is %d", devRough(a, n));
-}
-
 static __device__ bool isSorted;
 
-static __global__ void kernRough(const int32_t* const a, const int n,
-                                 int32_t* const b, int32_t* const c,
-                                 int* const d) {
+static __global__ void kernRadius(const int32_t* const a, const int n,
+                                  int32_t* const b, int32_t* const c,
+                                  int* const d) {
   const int id = blockIdx.x*blockDim.x + threadIdx.x;
   if (id >= n) {
     return;
@@ -81,7 +84,7 @@ static __global__ void kernRough(const int32_t* const a, const int n,
   d[id] = dist;
 }
 
-int devRough(const int32_t* const a, const int n) {
+int devRadius(const int32_t* const a, const int n) {
   const int nThreadsPerBlock = 1024;
   const int nBlocks = (n + nThreadsPerBlock - 1)/nThreadsPerBlock;
 
@@ -89,9 +92,8 @@ int devRough(const int32_t* const a, const int n) {
   int32_t* c = (int32_t*)cuMalloc(4*n);
   int* d = (int*)cuMalloc(sizeof(int)*n);
 
-  kernRough<<<nBlocks, nThreadsPerBlock>>>(a, n, b, c, d);
+  kernRadius<<<nBlocks, nThreadsPerBlock>>>(a, n, b, c, d);
 
-  cudaDeviceSynchronize();
   thrust::device_ptr<int> thrustD(d);
   const int k = *thrust::max_element(thrustD, thrustD + n);
 
@@ -100,4 +102,8 @@ int devRough(const int32_t* const a, const int n) {
   cuFree(d);
 
   return k;
+}
+
+void devRoughsort(int32_t* const a, const int n) {
+  msg("CUDA radius is %d", devRadius(a, n));
 }

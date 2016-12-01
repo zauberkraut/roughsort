@@ -14,7 +14,7 @@ extern int optind;
 namespace {
 
 const int64_t MIN_ARRAY_LEN = 2,
-              MAX_ARRAY_LEN = (1<<30) + (1<<29) + (1<<28), // ~1.75 bil. 7 GiB
+              MAX_ARRAY_LEN = (1<<30), // 4 GiB = ~1 billion 32-bit ints
               MIN_RAND_LEN = 1 << 10,
               MAX_RAND_LEN = 1 << 24;
 
@@ -148,7 +148,8 @@ int main(int argc, char* argv[]) {
   } benchmarks[] = {
     {"CPU Quicksort", hostQuicksort, runHostSorts, false},
     {"CPU Roughsort", hostRoughsort, runHostSorts, false},
-    {"GPU Radixsort", devQuicksort,  runDevSorts, true},
+    {"GPU Mergesort", devMergesort,  runDevSorts, true},
+    {"GPU Radixsort", devRadixsort,  runDevSorts, true},
     {"GPU Roughsort", devRoughsort,  runDevSorts, true}
   };
 
