@@ -199,6 +199,11 @@ void testDevRoughsort(void** state) {
   runDevSortTest(state, devRoughsort);
 }
 
+void testDevCheckSortedness(void ** state)
+{
+	runDevSortTest(state, devCheckSortedness);
+}
+
 } // end anonymous namespace
 
 int main2() {
@@ -213,6 +218,7 @@ int main2() {
     cmocka_unit_test(testDevMergesort),
     cmocka_unit_test(testDevQuicksort),
     cmocka_unit_test(testDevRoughsort),
+	cmocka_unit_test(testDevCheckSortedness)
   };
 
   return cmocka_run_group_tests(tests, 0, 0);

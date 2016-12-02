@@ -27,6 +27,7 @@ void hostRoughsort(int32_t* const a, const int n);
 void devMergesort(int32_t* const a, const int n);
 void devQuicksort(int32_t* const a, const int n);
 void devRoughsort(int32_t* const a, const int n);
+void devCheckSortedness(int32_t* const a, const int n);
 
 void msg(const char* s, ...);
 void warn(const char* s, ...);
