@@ -177,7 +177,11 @@ void testDevRadixsort(void** state) {
   runDevSortTest(state, devRadixsort);
 }
 void testDevRoughsort(void** state) {
-  runDevSortTest(state, devRoughsort);
+  // hack
+  auto wrapDevRoughsort = [](int32_t* const a, const int n) {
+    devRoughsort(a, MAX_TEST_LEN, n);
+  };
+  runDevSortTest(state, wrapDevRoughsort);
 }
 
 } // end anonymous namespace

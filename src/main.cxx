@@ -148,7 +148,6 @@ int main(int argc, char* argv[]) {
   struct {
     const char* name;
     std::function<void(int32_t* const, const int)> sort;
-//    void (*sort)(int32_t* const, const int);
     bool runTest;
     bool onGPU;
   } benchmarks[] = {
@@ -156,7 +155,7 @@ int main(int argc, char* argv[]) {
     {"CPU Roughsort", hostRoughsort,    runHostSorts, false},
     {"GPU Mergesort", devMergesort,     runDevSorts,  true},
     {"GPU Radixsort", devRadixsort,     runDevSorts,  true},
-    {"GPU Roughsort", wrapDevRoughsort, runDevSorts,  true}
+    {"GPU Roughsort", wrapDevRoughsort, runDevSorts,  true},
   };
 
   msg("running sort algorithm benchmarks...");
