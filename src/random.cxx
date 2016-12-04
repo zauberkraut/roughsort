@@ -1,98 +1,185 @@
-/* random.cxx: (P)RNGs and random sequence generator. */
-
-#include <climits>
+#include <algorithm>
+#include <chrono>
 //#include <cpuid.h>
-#include <ctime>
 #include <immintrin.h>
-#include <cstdlib>
+#include <random>
+#include <thread>
 #include "roughsort.h"
+
+void specificArray(int32_t* const a);
 
 namespace {
 
-unsigned state;
-uint64_t state64;
+	/* Tests for CPU support of the RDRAND instruction. */
+	bool rdRandSupported() {
+		unsigned eax, ebx, ecx, edx;
+		return false;
+	}
 
-/* Tests for CPU support of the RDRAND instruction. */
-bool rdRandSupported() {
-  unsigned eax, ebx, ecx, edx;
-  return true;
-}
+	/* Uses RDRAND instruction to generate high-quality random integers.
+	Intended for use in the creation of k-sorted sequences for a given k.
+	Requires an Ivy Bridge or newer x86 CPU. Requires no seeding. */
+	int32_t rdRand() {
+		static thread_local uint32_t w[2];
+		static thread_local int n = 0;
+		typedef unsigned int* p;
 
-/* Uses RDRAND instruction to generate high-quality random integers.
-   Intended for use in the creation of k-sorted sequences for a given k.
-   Requires an Ivy Bridge or newer x86 CPU. Requires no seeding. */
-int32_t rdRand() {
-  unsigned r;
-  if (_rdrand32_step(&r)) {
-    // TODO: perhaps save the discarded bit in case we run out of entropy
-    return (int32_t)(r >> 1);
-  }
-  // I'm not sure how often this should happen...
-  warn("RDRAND ran out of entropy; sourcing from rand()");
-  return (int32_t)(r ^ rand());
-}
+		if (!n) {
+			_rdrand32_step(reinterpret_cast<p>(w)); // assume entropy suffices
+			n = 2;
+		}
+		return (int32_t)(w[--n] >> 1);
+	}
 
-int32_t nullRand() {
-  fatal("randInt() was invoked before initialization!");
-  return 0;
-}
+	int32_t mtRand() {
+		static thread_local std::mt19937 // thread safe
+			rng(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+		return (int32_t)(rng() >> 1);
+	}
+
+	[[noreturn]] int32_t nullRand() {
+		fatal("randInt() was invoked before initialization!");
+	}
+
+	/* Either high-end RDRAND or mt19937. */
+	int32_t(*randInt)() = nullRand;
+
+	void kPerturb(int32_t* const a, const int k, const int n) {
+		int nDisplaced = 0;
+
+		while (!nDisplaced) {
+			for (int i = k; i < n; i++) {
+				if (randInt() & 1) {
+					auto x = a[i];
+					a[i] = a[i - k];
+					a[i - k] = x;
+
+					nDisplaced++;
+					i += k;
+				}
+			}
+		}
+	}
+
+	class ShuffleRNG {
+	public:
+		typedef unsigned result_type;
+		static unsigned min() { return 0; }
+		static unsigned max() { return INT32_MAX; }
+		unsigned operator()() {
+			return (unsigned)randInt();
+		}
+	};
+
+	void kShuffle(int32_t* const a, const int k, const int n) {
+		const int l = k + 1;
+		const int r = randInt() % (n - k);
+		const bool pushRight = randInt() & 1;
+		int32_t* const end = a + n;
+		int32_t* const p = pushRight ? a + r : end - 1 - r - k;
+		int32_t* const q = p + k;
+
+		// perform guaranteed k-displacement
+		const int32_t tmp = *p;
+		*p = *q;
+		*q = tmp;
+
+		for (int32_t* offset = a; offset < p; offset += l) {
+			int32_t* const cap = std::min(p, offset + l);
+			std::shuffle(offset, cap, ShuffleRNG());
+		}
+
+		std::shuffle(p + 1, q, ShuffleRNG());
+
+		for (int32_t* offset = q + 1; offset < end; offset += l) {
+			int32_t* const cap = std::min(end, offset + l);
+			std::shuffle(offset, cap, ShuffleRNG());
+		}
+	}
 
 } // end anonymous namespace
 
-/* Either high-end RDRAND or lousy rand(). */
-int32_t (*randInt)() = nullRand;
-
-/* Selects general-purpose RNG and seeds xorshift (and rand() if there's no
-   RDRAND support). */
-void randInit() {
-  if (rdRandSupported()) {
-    randInt = rdRand;
-    state = rdRand();
-    state64 = rdRand();
-  } else { // fall back on lousy cstdlib::rand() and time seeding
-    warn("Your CPU is old and an embarrassment; falling back on rand()");
-    randInt = rand;
-    state = time(0);
-    state64 = (((uint64_t)state << 32) + 1) | state;
-    srand(state);
-  }
-  xorsh();   // discard the first term since it's correlated with the seed
-  xorsh64();
+  /* Selects general-purpose RNG and seeds it if necessary. */
+void randInit(bool forceMT) {
+	if (rdRandSupported() && !forceMT) {
+		randInt = rdRand;
+	}
+	else { // fall back on the C++ MT generator and seed it
+		warn("Your CPU is old and an embarrassment; falling back on mt19937");
+		randInt = mtRand;
+	}
 }
 
-/* High-end and high-speed PRNG over a group structure.
-   This PRNG shall generate every nonzero 32-bit integer exactly once before
-   repeating and is meant to produce sequences without repeated elements. */
-int32_t xorsh() {
-  auto x = state;
-  x ^= x << 5;
-  x ^= x >> 17;
-  x ^= x << 13;
-  state = x;
-  return (int32_t)x;
+/* Random length for an unsorted array. This might not be uniform. */
+int randLen(int min, int max) { return randInt() % (max - min + 1) + min; }
+
+const int NTHREADS = 8;
+/* Memory-coalesced random array filler. */
+void randRun(int thId, int32_t* a, int n) {
+	for (int i = thId; i < n; i += NTHREADS) {
+		a[i] = randInt();
+	}
 }
 
-/* 64-bit version of the above, just in case. */
-int64_t xorsh64() {
-  auto x = state64;
-  x ^= x << 12;
-  x ^= x >> 7;
-  x ^= x << 13;
-  state64 = x;
-  return (int64_t)x;
+/* Randomizes an integer array with distinct 32-bit elements. Assumes k < n. */
+int randArray(int32_t* const a, const int k, const int n, bool shuffle) {
+	
+	if (n == 24)
+		specificArray(a);
+	
+	else {
+
+		std::thread runs[NTHREADS];
+
+		for (int i = 0; i < NTHREADS; i++) {
+			runs[i] = std::thread(randRun, i, a, n);
+		}
+
+		for (int i = 0; i < NTHREADS; i++) {
+			runs[i].join();
+		}
+
+		if (k >= 0) {
+			hostQuicksort(a, n);
+
+			if (k > 0) {
+				shuffle ? kShuffle(a, k, n) : kPerturb(a, k, n);
+			}
+		}
+	}
+	const int radius = hostRadius(a, n);
+	printf("random array is %d-sorted\n", radius);
+	if (radius != k && k > -1) {
+		fatal("...but we needed it %d-sorted!", k);
+	}
+
+	return radius;
 }
 
-/* Random length for an unsorted array. */
-int randLen(int min, int max) { return randIntN(max - min + 1) + min; }
-
-/* Randomizes an integer array with distinct 32-bit elements. */
-void randArray(int32_t* const a, const int n, const int k) {
-
-
-
-  for (int i = 0; i < n; i++) {
-    a[i] = xorsh();
-  }
-
-  // TODO: sort the array and k-disorder it (k == -1 => don't bother)
+void specificArray(int32_t* const a) {
+	int i = 0;
+	a[i++] = 2;
+	a[i++] = 3;
+	a[i++] = 5;
+	a[i++] = 1;
+	a[i++] = 4;
+	a[i++] = 2;
+	a[i++] = 6;
+	a[i++] = 8;
+	a[i++] = 7;
+	a[i++] = 9;
+	a[i++] = 8;
+	a[i++] = 11;
+	a[i++] = 6;
+	a[i++] = 13;
+	a[i++] = 12;
+	a[i++] = 16;
+	a[i++] = 15;
+	a[i++] = 17;
+	a[i++] = 18;
+	a[i++] = 20;
+	a[i++] = 18;
+	a[i++] = 19;
+	a[i++] = 21;
+	a[i++] = 19;
 }

@@ -1,203 +1,261 @@
-/* main.cxx */
-
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <time.h>
-#include "wingetopt.h"
+#include <functional>
 #include "roughsort.h"
+#include "wingetopt.h"
 #include <iostream>
 
 // for dealing with getopt arguments
 extern char *optarg;
 extern int optind;
 
+int clock_gettime(int, timespec *spec);
+void devCheckSortedness(int32_t* const a, const int n);
+
 namespace {
 
-enum {
-  MIN_ARRAY_LEN = 0,
-  MAX_ARRAY_LEN = (1 << 30) + (1 << 29) + (1 << 28), // ~1.75 bil. ints, 7 GiB
-  MIN_RAND_LEN = 1 << 10,
-  MAX_RAND_LEN = 1 << 24
-};
+	const int64_t MIN_ARRAY_LEN = 2,
+		MAX_ARRAY_LEN = (1 << 30), // 4 GiB = ~1 billion 32-bit ints
+		MIN_RAND_LEN = 1 << 10,
+		MAX_RAND_LEN = 1 << 24;
 
-/* Parses an integer argument of the given radix from the command line, aborting
-   after printing errMsg if an error occurs or the integer exceeds the given
-   bounds. */
-int parseInt(int radix, int min, int max, const char* errMsg) {
-  char* parsePtr = nullptr;
-  int i = strtol(optarg, &parsePtr, radix);
-  if ((size_t)(parsePtr - optarg) != strlen(optarg) || i < min || i > max ||
-      ERANGE == errno) {
-    fatal(errMsg);
-  }
-  return i;
-}
+	/* Parses an integer argument of the given radix from the command line, aborting
+	after printing errMsg if an error occurs or the integer exceeds the given
+	bounds. */
+	int parseInt(int radix, int64_t min, int64_t max, const char* errMsg) {
+		char* parsePtr = nullptr;
+		auto l = strtoll(optarg, &parsePtr, radix);
+		if ((size_t)(parsePtr - optarg) != strlen(optarg) || l < min || l > max ||
+			ERANGE == errno) {
+			fatal(errMsg);
+		}
+		return l;
+	}
 
-void getTime(void* start) 
-{
-  //clock_gettime(CLOCK_MONOTONIC, start)
-	return;
-}
+	void getTime(timespec* start) {
+		clock_gettime(0, start);
+	}
 
+	int msSince(timespec* start) {
+		timespec time;
+		getTime(&time);
+		return (time.tv_sec - start->tv_sec) * 1000 +
+			(time.tv_nsec - start->tv_nsec) / 1.e6;
+	}
 
+	[[noreturn]] void usage() {
+		msg("roughsort [options]\n"
+			"  -h        These instructions\n"
+			"  -g        Skip the sequential, non-GPU algorithms\n"
+			"  -k <int>  Set the k-sortedness of the random array (default: don't k-sort)\n"
+			"  -m        Force usage of software Mersenne Twister RNG\n"
+			"  -n <len>  Set randomized array length (default: random)\n"
+			"  -s        Shuffle each (k + 1)-segment\n"
+			"  -t        Confirm sorted array is in order\n");
+		exit(1);
+	}
 
-void usage() {
-  msg("roughsort [options]\n"
-      "  -h        These instructions\n"
-      "  -g        Skip the sequential, non-GPU algorithms\n"
-      "  -k <int>  Set the k-sortedness of the random array (default: don't k-sort)\n"
-      "  -n <len>  Set randomized array length (default: random)\n"
-      "  -t        Confirm sorted array is in order\n");
-  exit(1);
-}
+	bool testArrayEq(const int32_t* const a, const int32_t* const b, const int n) {
+		for (int i = 0; i < n; i++) {
+			if (a[i] != b[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
 
-bool testArrayEq(const int32_t* const a, const int32_t* const b, const int n) {
-  for (int i = 0; i < n; i++) {
-    if (a[i] != b[i]) {
-      return false;
-    }
-  }
-  return true;
-}
+	bool testArrayUniform(const int32_t* const a, const int n)
+	{
+		for (int i = 1; i < n; i++)
+		{
+			if (a[i] != a[0])
+				return false;
+		}
+		return true;
+	}
 
 } // end anonymous namespace
 
 int main(int argc, char* argv[]) {
-  msg("Roughsort Demonstration\nA. Pfaff, J. Treadwell 2016\n");
-  randInit();
+	msg("Roughsort Demonstration\nA. Pfaff, J. Treadwell 2016\n");
 
-  bool runHostSorts = true;
-  int k = -1;
-  int arrayLen = randLen(MIN_RAND_LEN, MAX_RAND_LEN);
-  bool testSorted = false;
+	bool runHostSorts = true;
+	int k = -1;
+	bool forceMT = false;
+	int arrayLen = 0;
+	bool shuffle = false;
+	bool testSorted = false;
 
-  int option;
-  while ((option = getopt(argc, argv, "hgk:n:t")) != -1) {
-    switch (option) {
-    case 'h':
-      usage();
+	int option;
+	while ((option = getopt(argc, argv, "hgk:mn:st")) != -1) {
+		switch (option) {
+		case 'h':
+			usage();
 
-    case 'g':
-      runHostSorts = false;
-      break;
+		case 'g':
+			runHostSorts = false;
+			break;
 
-    case 'k':
-      k = (int)parseInt(10, 0, MAX_ARRAY_LEN, "invalid k-sortedness");
-      break;
+		case 'k':
+			k = (int)parseInt(10, 0, MAX_ARRAY_LEN, "invalid k-sortedness");
+			break;
 
-    case 'n':
-      arrayLen = (int)parseInt(10, MIN_ARRAY_LEN, MAX_ARRAY_LEN,
-                               "invalid unsorted array length");
-      break;
+		case 'm':
+			msg("forcing usage of software RNG");
+			forceMT = true;
+			break;
 
-    case 't':
-      testSorted = true;
-      break;
+		case 'n':
+			arrayLen = (int)parseInt(10, MIN_ARRAY_LEN, MAX_ARRAY_LEN,
+				"invalid unsorted array length");
+			break;
 
-    case '?': // deal with ill-formed parameterless option
-    default:  // ...or invalid option
-      usage();
-    }
-  }
-  if (optind < argc) { // reject extra arguments
-    fatal("unexpected argument: %s", argv[optind]);
-  }
-  if (k >= arrayLen) {
-    fatal("an array of length %d can't be %d-sorted!", arrayLen, k);
-  }
+		case 's':
+			msg("random array shuffling enabled");
+			shuffle = true;
+			break;
 
-  const auto arraySize = 4*arrayLen;
-  msg("allocating storage...");
-  int32_t* const hostUnsortedArray = new int32_t[arrayLen];
-  int32_t* const hostSortingArray  = new int32_t[arrayLen];
-  int32_t* hostReferenceArray = nullptr;
-  int32_t* const devSortingArray = (int32_t*)cuMalloc(arraySize);
+		case 't':
+			testSorted = true;
+			break;
 
-  msg("generating a random array of %d integers...", arrayLen);
-  randArray(hostUnsortedArray, arrayLen, k);
- 
+		case '?': // deal with ill-formed parameterless option
+		default:  // ...or invalid option
+			usage();
+		}
+	}
+	if (optind < argc) { // reject extra arguments
+		fatal("unexpected argument: %s", argv[optind]);
+	}
+	if (k >= arrayLen) {
+		fatal("an array of length %d can't be %d-sorted!", arrayLen, k);
+	}
 
+	randInit(forceMT);
+	if (!arrayLen) {
+		arrayLen = randLen(MIN_RAND_LEN, MAX_RAND_LEN);
+	}
 
+	const size_t arraySize = 4 * (size_t)arrayLen;
+	msg("allocating storage...");
+	int32_t* const hostUnsortedArray = new int32_t[arrayLen];
+	int32_t* const hostSortingArray = new int32_t[arrayLen];
+	int32_t* hostReferenceArray = nullptr;
 
-  struct {
-    const char* name;
-    void (*sort)(int32_t* const, const int);
-    bool runTest;
-    bool onGPU;
-  } benchmarks[] = {
-    {"CPU Mergesort", hostMergesort, runHostSorts, false},
-    {"CPU Quicksort", hostQuicksort, runHostSorts, false},
-    {"CPU Roughsort", hostRoughsort, false && runHostSorts, false},
-    {"GPU Mergesort", devMergesort,  true, true},
-	{ "GPU Sortedness Check", devCheckSortedness, true, true },
-    {"GPU Quicksort", devQuicksort,  true, true},
-	{ "GPU Roughsort", devRoughsort, false, true },
+	msg("%.3f MiB device RAM available, using %.3f MiB", mibibytes(cuMemAvail()),
+		mibibytes(arraySize));
+	int32_t* const devSortingArray = (int32_t*)cuMalloc(arraySize);
 
-  };
+	msg("generating a random array of %d integers...", arrayLen);
+	const int radius = randArray(hostUnsortedArray, k, arrayLen, shuffle);
 
-  msg("running sort algorithm benchmarks...");
+	auto wrapDevRoughsort = [radius](int32_t* const a, const int n) {
+		devRoughsort(a, radius, n);
+	};
 
-  for (auto const bench : benchmarks) {
-    if (bench.runTest) {
-      const bool referenceSort = testSorted && hostReferenceArray == nullptr;
+	const bool runDevSorts = true;
 
-      if (bench.onGPU) {
-        cuUpload(devSortingArray, hostUnsortedArray, arraySize);
-      } else {
-        memcpy(hostSortingArray, hostUnsortedArray, arraySize);
-      }
+	struct {
+		const char* name;
+		std::function<void(int32_t* const, const int)> sort;
+		bool runTest;
+		bool onGPU;
+	} benchmarks[] = {
+		{ "CPU Quicksort ", hostQuicksort,    runHostSorts, false },
+		{ "CPU Bubblesort", hostBubblesort,   runHostSorts, false },
+		{ "CPU Roughsort ", hostRoughsort,    runHostSorts, false },
+		{ "GPU Mergesort ", devMergesort,     runDevSorts,  true },
+		{ "GPU Radixsort ", devRadixsort,     runDevSorts,  true },
+		{ "GPU Roughsort ", wrapDevRoughsort, runDevSorts,  true },
+		{ "GPU Radius ", devCheckSortedness, runDevSorts, true}
+	};
 
-      bench.sort(bench.onGPU ? devSortingArray : hostSortingArray, arrayLen);
+	msg("running sort algorithm benchmarks...");
 
-      auto resultMsg = "";
+	for (auto const bench : benchmarks) {
+		if (bench.runTest) {
+			const bool referenceSort = testSorted && hostReferenceArray == nullptr;
 
-      if (referenceSort) {
-        /* NOTE: We could maintain separate reference and unsorted arrays on the
-                 GPU, but we probably can't afford the extra device RAM and
-                 won't need the speedup. */
-        hostReferenceArray = new int32_t[arrayLen];
-        msg("copying sorted array to reference for testing further results...");
-        if (bench.onGPU) {
-          cuDownload(hostReferenceArray, devSortingArray, arraySize);
-        } else {
-          memcpy(hostReferenceArray, hostSortingArray, arraySize);
-        }
-      } else if (testSorted) 
-	  {
-        if (bench.onGPU) {
-          cuDownload(hostSortingArray, devSortingArray, arraySize);
-        }
-        if(!testArrayEq(hostSortingArray, hostReferenceArray, arrayLen)) {
-          resultMsg = " BUT IS BROKEN";
-        }
+			if (bench.onGPU) {
+				cuUpload(devSortingArray, hostUnsortedArray, arraySize);
+			}
+			else {
+				memcpy(hostSortingArray, hostUnsortedArray, arraySize);
+			}
 
-		if (arrayLen < 10)
-		{
-			for (int i = 0; i < arrayLen; i++)
-			{
-				std::cout << "\t" << i << "," << hostSortingArray[i];
-				for (int j = 0; j < arrayLen; j++)
-				{
-					if (hostReferenceArray[j] == hostSortingArray[i])
-					{
-						std::cout << "[" << abs(i - j) << "]" << std::endl;
-					}
+			timespec start;
+			getTime(&start);
+			bench.sort(bench.onGPU ? devSortingArray : hostSortingArray, arrayLen);
+			auto ms = msSince(&start);
+
+			auto resultMsg = "";
+
+			if (referenceSort) {
+				/* NOTE: We could maintain separate reference and unsorted arrays on the
+				GPU, but we probably can't afford the extra device RAM and
+				won't need the speedup. */
+				hostReferenceArray = new int32_t[arrayLen];
+				msg("copying sorted array to reference for testing further results...");
+				if (bench.onGPU) {
+					cuDownload(hostReferenceArray, devSortingArray, arraySize);
+				}
+				else {
+					memcpy(hostReferenceArray, hostSortingArray, arraySize);
 				}
 			}
+			if (testSorted) {
+				if (bench.onGPU) {
+					cuDownload(hostSortingArray, devSortingArray, arraySize);
+				}
+				if (!testArrayEq(hostSortingArray, hostReferenceArray, arrayLen)) {
+					resultMsg = " BUT IS BROKEN";
+				}
+				bool uniformSrtArr = false;
+				bool uniformRefArr = false;
+				if (testArrayUniform(hostSortingArray, arrayLen))
+				{
+					uniformSrtArr = true;
+				}
+				if (testArrayUniform(hostReferenceArray, arrayLen))
+				{
+					uniformRefArr = true;
+				}
+				if (arrayLen < 10 && !uniformRefArr && !uniformSrtArr)
+				{
+					for (int i = 0; i < arrayLen; i++)
+					{
+						std::cout << "\t" << i << "," << hostSortingArray[i];
+						for (int j = 0; j < arrayLen; j++)
+						{
+							if (hostReferenceArray[j] == hostSortingArray[i])
+							{
+								std::cout << "[" << abs(i - j) << "]" << std::endl;
+							}
+						}
+					}
+				}
+				else if (uniformSrtArr)
+				{
+					std::cout << "sort array is uniform" << std::endl;
+				}
+				else if (uniformRefArr)
+				{
+					std::cout << "ref array is uniform" << std::endl;
+				}
+
+			}
+
+
+			msg("  %s took %d ms%s", bench.name, ms, resultMsg);
 		}
+	}
 
-      }
+	delete[] hostUnsortedArray;
+	delete[] hostSortingArray;
+	delete[] hostReferenceArray; // nullptr deletion is safe
+	cuFree(devSortingArray);
 
-      msg("  %s took %d ms%s", bench.name, 0, resultMsg);
-    }
-  }
-
-  delete[] hostUnsortedArray;
-  delete[] hostSortingArray;
-  delete[] hostReferenceArray; // nullptr deletion is safe
-  cuFree(devSortingArray);
-
-  return 0;
+	return 0;
 }
