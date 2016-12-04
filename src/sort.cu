@@ -74,22 +74,50 @@ void devRoughsort(int32_t* const a, const int radius, const int n) {
 }
 
 
-__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r, int * l, int * m, int * o, int * p, bool * sorted, int tpbBits, int g0Bits, int g1Bits)
+__global__ void downInDM(int n, int * b, int * c, int * d)
 {
-	
-	unsigned long long threadXBits = (unsigned long long)threadIdx.x;
-	unsigned long long gridXBits = (unsigned long long)(blockIdx.x) << tpbBits;
-	unsigned long long gridYBits = (unsigned long long)(blockIdx.y) << tpbBits;
-	gridYBits = gridYBits << g0Bits;
-	unsigned long long thread_id = gridXBits | gridYBits | threadXBits;
-	
+
+	const int thread_id = blockIdx.x*blockDim.x + threadIdx.x;
+
 	int local_id = 0;
 	if (thread_id < n)
-		local_id = (int)thread_id;
+		local_id = thread_id;
 	else
 		return;
 
-	//atomicAdd(r, local_id);
+	__syncthreads();
+	__threadfence();
+	int i = local_id;
+
+	for (int r = 0; r <= log2((double)n); r++)
+	{
+		int j = max((double)0, (double)(i - exp2((double)r)));
+		//if (j <= i && i >= 0 && c[i] <= b[j] && -- note the removed criteria from seq
+		if (j <= i && i >= 0 &&
+			(j == 0 || c[i] >= b[j - 1])) {
+			d[i] = i - j;
+			return;
+
+		}
+		__threadfence();
+		__syncthreads();
+	}
+}
+
+__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r, int * l, int * m, int * o, int * p, bool * sorted, int tpbBits, int g0Bits, int g1Bits)
+{
+	
+	const int thread_id = blockIdx.x*blockDim.x + threadIdx.x;
+
+	int local_id = 0;
+	if (thread_id < n)
+		local_id = thread_id;
+	else
+		return;
+
+	atomicAdd(r, thread_id);
+	
+
 	
 	b[local_id] = a[local_id];
 	c[local_id] = a[local_id];
@@ -101,7 +129,9 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 	for (int r = 0; r < log2((double)(n)); r++)
 	{
 		*sorted = true;
+		__threadfence();
 		devCheckIfSorted(b, n, local_id, sorted);
+		__threadfence();
 		if (*sorted == true)
 		{
 			break;
@@ -115,8 +145,11 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 	//min-prefix
 	for (int r = 0; r < log2((double)(n)); r++)
 	{
+
 		*sorted = true;
+		__threadfence();
 		devCheckIfSorted(c, n, local_id, sorted);
+		__threadfence();
 		if (*sorted == true)
 		{
 			break;
@@ -147,23 +180,26 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 		p[local_id] = 1;
 	}*/
 
-	__syncthreads();
 
-	int i = local_id;
 
-	for (int r = 0; r <= log2((double)n); r++)
+
+	/*
+	int j = i;
+	for (int r = log2((double)n); r >= 0; r--)
 	{
-			int j = max((double)0, (double)(i - exp2((double)r)));
-			//if (j <= i && i >= 0 && c[i] <= b[j] && -- note the removed criteria from seq
-			if (j <= i && i >= 0 &&
+			
+			
+			if (j <= i && i >= 0 && c[i] <= b[j] &&
+			//if (j <= i && i >= 0 &&
 				(j == 0 || c[i] >= b[j - 1])) {
 				d[i] = i - j;
 				return;
 			}
-			o[i] = r;
-			p[i] = j;
-			m[i] = b[j - 1];
-	}
+			else {
+				j = c[i] <= b[j] ? max((double)0, (double)(j - exp2((double)r))) : min((double)n - 1, j + exp2((double)r));
+			}
+	}*/
+
 
 
 }
@@ -187,8 +223,7 @@ void devCheckSortedness(int32_t* const a, const int n)
 
 	unsigned long long max = n;
 	unsigned long long threadblockX = max / deviceProp.maxThreadsPerBlock > 1 ? deviceProp.maxThreadsPerBlock : max;
-	//threadblockX = threadblockX == 0 ? 1 : threadblockX;
-	threadblockX = 128;
+	threadblockX = threadblockX == 0 ? 1 : threadblockX;
 	std::cout << "Thread block X: " << threadblockX << std::endl;
 	//std::cout << "Max block X: " << deviceProp.maxThreadsPerBlock << std::endl;
 
@@ -210,8 +245,9 @@ void devCheckSortedness(int32_t* const a, const int n)
 	std::cout << "Grid Y: " << gridY << std::endl;
 	//std::cout << "Max Grid Y: " << deviceProp.maxGridSize[1] << std::endl;
 
-	dim3 dimBlock(threadblockX, threadblockY, threadblockZ);
-	dim3 dimGrid(gridX, gridY, 1);
+	const int nThreadsPerBlock = 1024;
+	const int nBlocks = (n + nThreadsPerBlock - 1) / nThreadsPerBlock;
+
 
 	int * b = (int*)cuMalloc(sizeof(int) * n);
 	int * c = (int*)cuMalloc(sizeof(int) * n);
@@ -234,10 +270,16 @@ void devCheckSortedness(int32_t* const a, const int n)
 
 	clock_t tStart = clock();
 
-	devCheckSortednessCallee << <dimGrid, dimBlock >> >(a, n, k, b, c, d, r, l, m, o, p, sorted, 
-		//log2(deviceProp.maxThreadsPerBlock), 
-		log2(128),
+	devCheckSortednessCallee << <nBlocks, nThreadsPerBlock >> >(a, n, k, b, c, d, r, l, m, o, p, sorted, 
+		log2(deviceProp.maxThreadsPerBlock), 
 		log2(deviceProp.maxGridSize[0]), log2(deviceProp.maxGridSize[1]));
+	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
+	cudaThreadSynchronize();
+	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
+	cudaDeviceSynchronize();
+	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
+	downInDM << <nBlocks, nThreadsPerBlock >> >(n, b, c, d);
+
 	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
 	cudaThreadSynchronize();
 	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
@@ -257,6 +299,7 @@ void devCheckSortedness(int32_t* const a, const int n)
 	int * m_host = (int*)malloc(sizeof(int) * n);
 	int * o_host = (int*)malloc(sizeof(int) * n);
 	int * p_host = (int*)malloc(sizeof(int) * n);
+	int * a_host = (int*)malloc(sizeof(int) * n);
 	cudaMemcpy(b_host, b, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	cudaMemcpy(c_host, c, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	cudaMemcpy(d_host, d, sizeof(int) * n, cudaMemcpyDeviceToHost);
@@ -271,6 +314,8 @@ void devCheckSortedness(int32_t* const a, const int n)
 	CHECK(cudaGetLastError());
 	cudaMemcpy(p_host, p, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	CHECK(cudaGetLastError());
+	cudaMemcpy(a_host, a, sizeof(int) * n, cudaMemcpyDeviceToHost);
+	CHECK(cudaGetLastError());
 	k_host = *(thrust::max_element(thrust::host, &d_host[0], &d_host[n]));
 
 
@@ -278,10 +323,10 @@ void devCheckSortedness(int32_t* const a, const int n)
 	std::cout << "K value: " << k_host << std::endl;
 	std::cout << "R value: " << r_host << std::endl;
 	
-	if(n<=256)
+	if(n<=256 || n == 4096)
 	for (int i = 0; i < n; i++)
 	{
-		cout << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << "\t" << l_host[i] << "\t" << o_host[i] << "\t" << m_host[i] << "\t" << p_host[i] << endl;
+		cout << a_host[i] << "\t" << i << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << "\t" << l_host[i] << "\t" << o_host[i] << "\t" << m_host[i] << "\t" << p_host[i] << endl;
 	}
 	
 
