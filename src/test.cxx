@@ -14,7 +14,7 @@ extern "C" {
 namespace {
 
 enum { MAX_TEST_LEN = 64 }; // UPDATE IF A LONGER TEST IS ADDED
-int32_t g_test0[]  = {},
+int32_t /*g_test0[]  = {},*/
         g_test1[]  = {0},
         g_test2[]  = {0, 0},
         g_test3[]  = {0, 1},
@@ -56,7 +56,7 @@ const int g_testRadius = 5;
 #define ALEN(a) (sizeof(a) / sizeof(*a))
 #define ATEST(a) {a, ALEN(a)}
 struct Test { int32_t* const a; const int n; } g_tests[] = {
-  ATEST(g_test0), ATEST(g_test1), ATEST(g_test2), ATEST(g_test3),
+  /*ATEST(g_test0),*/ ATEST(g_test1), ATEST(g_test2), ATEST(g_test3),
   ATEST(g_test4), ATEST(g_test5), ATEST(g_test6), ATEST(g_test7),
   ATEST(g_test8), ATEST(g_test9), ATEST(g_test10), ATEST(g_test11),
   ATEST(g_test12), ATEST(g_test13), ATEST(g_test14), ATEST(g_test15),

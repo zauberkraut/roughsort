@@ -26,31 +26,30 @@ void devRadixsort(int32_t* const a, const int n) {
   cudaDeviceSynchronize();
 }
 
-static __global__ void kernHalve(int32_t* const a, const int radius,
-                                 const int n) {
-  const int i = min(n, radius*(blockIdx.x*blockDim.x + threadIdx.x));
-  const int j = min(n, i + radius);
-  const int k = min(n, i + (radius>>1));
-  const int l = min(n, k + radius);
+static __global__ void kernBatchSort(int32_t* const a, const int n,
+                                     const int offset, const int len) {
+  const int start = min(n, offset +
+                           len*(blockIdx.x*blockDim.x + threadIdx.x));
+  const int end   = min(n, start + len);
 
-  thrust::sort(thrust::seq, a + i, a + j);
-  thrust::sort(thrust::seq, a + k, a + l);
-  thrust::sort(thrust::seq, a + i, a + j);
+  thrust::sort(thrust::seq, a + start, a + end);
 }
 
-/* Parallel roughsort implementation.
-   ASSUMES k > 1 */
+/* Parallel roughsort implementation. */
 void devRoughsort(int32_t* const a, const int radius, const int n) {
-  if (!radius || n < 2) {
+  if (radius == 0) {
     return;
   }
+  const int blockDim = 512;
 
   cudaError_t r;
   int k = radius, p = 0;
   do {
-    const int nSegments = (n + k - 1)/k;
-    const int nBlocks = (nSegments + 511)/512;
-    kernHalve<<<nBlocks, 512>>>(a, k, n);
+    const int len = k << 1;
+    const int nSegments = (n + len - 1)/len;
+    const int nBlocks = (nSegments + blockDim-1)/blockDim;
+    kernBatchSort<<<nBlocks, blockDim>>>(a, n, 0, len);
+    kernBatchSort<<<nBlocks, blockDim>>>(a, n, k, len);
     r = cudaGetLastError();
 
     k = radius / (2 << p++);
