@@ -103,6 +103,23 @@ void hostQuicksort(int32_t* const a, const int n) {
   std::sort(a, a + n);
 }
 
+void hostBubblesort(int32_t* const a, const int n) {
+  bool outOfOrder;
+
+  do {
+    outOfOrder = false;
+
+    for (int i = 0; i < n-1; i++) {
+      int l = a[i], r = a[i+1];
+      if (l > r) {
+        a[i] = r;
+        a[i+1] = l;
+        outOfOrder = true;
+      }
+    }
+  } while (outOfOrder);
+}
+
 /* Computes the smallest k for which a is k-sorted (aka the "radius" of a). */
 int hostRadius(const int32_t* const a, const int n) {
   int32_t* b = new int[n];

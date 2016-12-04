@@ -167,6 +167,9 @@ void testHostRough(void** state) {
 void testHostQuicksort(void** state) {
   runHostSortTest(state, hostQuicksort);
 }
+void testHostBubblesort(void** state) {
+  runHostSortTest(state, hostBubblesort);
+}
 void testHostRoughsort(void** state) {
   runHostSortTest(state, hostRoughsort);
 }
@@ -193,6 +196,7 @@ int main() {
     cmocka_unit_test(testDevMemory),
     cmocka_unit_test(testHostRough),
     cmocka_unit_test(testHostQuicksort),
+    cmocka_unit_test(testHostBubblesort),
     cmocka_unit_test(testHostRoughsort),
     cmocka_unit_test(testDevMergesort),
     cmocka_unit_test(testDevRadixsort),

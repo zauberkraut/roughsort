@@ -8,6 +8,7 @@ int randLen(int min, int max);
 int randArray(int32_t* const a, const int k, const int n, bool shuffle);
 
 void hostQuicksort(int32_t* const a, const int n);
+void hostBubblesort(int32_t* const a, const int n);
 int hostRadius(const int32_t* const a, const int n);
 void hostRoughsort(int32_t* const a, const int n);
 
