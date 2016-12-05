@@ -5,6 +5,7 @@
 #include <random>
 #include <thread>
 #include "roughsort.h"
+#include <iostream>
 
 void specificArray(int32_t* const a);
 
@@ -152,6 +153,15 @@ int randArray(int32_t* const a, const int k, const int n, bool shuffle) {
 	if (radius != k && k > -1) {
 		fatal("...but we needed it %d-sorted!", k);
 	}
+
+	int zc = 0;
+	for (int i = 0; i < n; i++)
+	{
+		if (a[i] == 0)
+			zc++;
+	}
+	if (zc > 0)
+		std::cout << "There are zeroes in a[]: " << zc << std::endl;
 
 	return radius;
 }

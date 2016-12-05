@@ -163,13 +163,13 @@ int main(int argc, char* argv[]) {
 		bool runTest;
 		bool onGPU;
 	} benchmarks[] = {
-		{ "CPU Quicksort ", hostQuicksort,    runHostSorts, false },
-		{ "CPU Bubblesort", hostBubblesort,   runHostSorts, false },
-		{ "CPU Roughsort ", hostRoughsort,    runHostSorts, false },
-		{ "GPU Mergesort ", devMergesort,     runDevSorts,  true },
-		{ "GPU Radixsort ", devRadixsort,     runDevSorts,  true },
-		{ "GPU Roughsort ", wrapDevRoughsort, runDevSorts,  true },
-		{ "GPU Radius ", devCheckSortedness, runDevSorts, true}
+		{ "CPU Quicksort ", hostQuicksort,    runHostSorts && false, false },
+		{ "CPU Bubblesort", hostBubblesort,   runHostSorts && false, false },
+		{ "CPU Roughsort ", hostRoughsort,    runHostSorts && false, false },
+		{ "GPU Mergesort ", devMergesort,     runDevSorts && false,  true },
+		{ "GPU Radixsort ", devRadixsort,     runDevSorts && false,  true },
+		{ "GPU Roughsort ", wrapDevRoughsort, runDevSorts && false,  true },
+		{ "GPU Radius ", devCheckSortedness, runDevSorts, false}
 	};
 
 	msg("running sort algorithm benchmarks...");

@@ -19,7 +19,7 @@ using namespace std;
 
 #define CHECK(r) cuCheck(r, __FILE__, __LINE__) //TODO: get util.h created for windows branch
 inline void cuCheck(cudaError_t r, const char* fname, const size_t lnum);
-__device__ void devCheckIfSorted(int32_t* a, int n, int local_id, bool * sorted);
+__device__ void devCheckIfSorted(volatile int32_t* a, int n, int local_id, volatile bool * sorted);
 
 void devRadixsort(int32_t* const a, const int n) {
 	thrust::device_ptr<int32_t> devA(a);
@@ -74,7 +74,7 @@ void devRoughsort(int32_t* const a, const int radius, const int n) {
 }
 
 
-__global__ void downInDM(int n, int * b, int * c, int * d)
+__global__ void downInDM(int n, volatile int * b, volatile int * c, volatile int * d)
 {
 
 	const int thread_id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -104,7 +104,7 @@ __global__ void downInDM(int n, int * b, int * c, int * d)
 	}
 }
 
-__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r, int * l, int * m, int * o, int * p, bool * sorted, int tpbBits, int g0Bits, int g1Bits)
+__global__ void devCheckSortednessCallee(volatile int32_t* const a, const int n, int * k, volatile int * b, volatile int * c, volatile int * d, int * r, int * l, int * m, int * o, int * p, volatile bool * sorted, int tpbBits, int g0Bits, int g1Bits)
 {
 	
 	const int thread_id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -118,20 +118,53 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 	atomicAdd(r, thread_id);
 	
 
-	
-	b[local_id] = a[local_id];
 	c[local_id] = a[local_id];
+	b[local_id] = a[local_id];
 	d[local_id] = 0;
 	l[local_id] = 0;
 	m[local_id] = 0;
-	
+	__threadfence();
+	__syncthreads();
+
+	for (int r = 0; r < log2((double)(n)); r++)
+	{
+
+		*sorted = true;
+		__threadfence();
+		__syncthreads();
+		devCheckIfSorted(c, n, local_id, sorted);
+		__threadfence();
+		__syncthreads();
+		if (*sorted == true)
+		{
+			break;
+		}
+		else if (local_id + exp2((double)r) < n)
+		{
+			int idx = local_id + exp2((double)r);
+			
+			if (min(c[local_id], c[idx]) == 0)
+			{
+				l[local_id] = idx;
+				o[local_id] = local_id;
+				m[local_id] = r;
+				p[local_id] = c[local_id];
+			}
+			c[local_id] = min(c[local_id], c[idx]);
+			__threadfence();
+			__syncthreads();
+		}
+	}
+
 	//max-prefix - 
 	for (int r = 0; r < log2((double)(n)); r++)
 	{
 		*sorted = true;
 		__threadfence();
+		__syncthreads();
 		devCheckIfSorted(b, n, local_id, sorted);
 		__threadfence();
+		__syncthreads();
 		if (*sorted == true)
 		{
 			break;
@@ -143,26 +176,10 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 		}
 	}
 	//min-prefix
-	for (int r = 0; r < log2((double)(n)); r++)
-	{
 
-		*sorted = true;
-		__threadfence();
-		devCheckIfSorted(c, n, local_id, sorted);
-		__threadfence();
-		if (*sorted == true)
-		{
-			break;
-		}
-		else if (local_id + exp2((double)r) < n)
-		{
-			int idx = local_id + exp2((double)r);
-			c[local_id] = min(c[local_id], c[idx]);
-		}
-	}
 	
 	__syncthreads();
-
+	__threadfence();
 	/*
 	if (c[local_id] < b[local_id])
 		l[local_id] = 1;
@@ -204,7 +221,7 @@ __global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k,
 
 }
 
-__device__ void devCheckIfSorted(int32_t* a, int n, int local_id, bool * sorted)
+__device__ void devCheckIfSorted(volatile int32_t* a, int n, int local_id, volatile bool * sorted)
 {
 
 	if (a[local_id] > a[min(local_id + 1, n - 1)])
@@ -220,6 +237,7 @@ void devCheckSortedness(int32_t* const a, const int n)
 	cudaGetDeviceProperties(&deviceProp, 0);
 	cout << "using " << deviceProp.multiProcessorCount << " multiprocessors" << endl;
 	cout << "max threads per processor: " << deviceProp.maxThreadsPerMultiProcessor << endl;
+
 
 	unsigned long long max = n;
 	unsigned long long threadblockX = max / deviceProp.maxThreadsPerBlock > 1 ? deviceProp.maxThreadsPerBlock : max;
@@ -248,29 +266,32 @@ void devCheckSortedness(int32_t* const a, const int n)
 	const int nThreadsPerBlock = 1024;
 	const int nBlocks = (n + nThreadsPerBlock - 1) / nThreadsPerBlock;
 
+	volatile int * a_dev = (int*)cuMalloc(sizeof(int) * n);
+	volatile int * b = (int*)cuMalloc(sizeof(int) * n);
+	volatile int * c = (int*)cuMalloc(sizeof(int) * n);
+	volatile int * d = (int*)cuMalloc(sizeof(int) * n);
 
-	int * b = (int*)cuMalloc(sizeof(int) * n);
-	int * c = (int*)cuMalloc(sizeof(int) * n);
-	int * d = (int*)cuMalloc(sizeof(int) * n);
 	int * l = (int*)cuMalloc(sizeof(int) * n);
 	int * m = (int*)cuMalloc(sizeof(int) * n);
 	int * o = (int*)cuMalloc(sizeof(int) * n);
 	int * p = (int*)cuMalloc(sizeof(int) * n);
 	int * r = (int*)cuMalloc(sizeof(int));
 	int * k = (int*)cuMalloc(sizeof(int));
-	bool * sorted = (bool*)cuMalloc(sizeof(bool));
+	volatile bool * sorted = (bool*)cuMalloc(sizeof(bool));
 
 
 	int r_host = 0;
-	int sorted_host = false;
+	bool sorted_host = false;
 
 	CHECK(cudaMemcpy(r, &r_host, 1, cudaMemcpyHostToDevice));
-	CHECK(cudaMemcpy(sorted, &sorted_host, 1, cudaMemcpyHostToDevice));
-
+	CHECK(cudaMemcpy((bool *)sorted, (bool *)&sorted_host, sizeof(bool), cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy((int *)a_dev, (int *)a, sizeof(int) * n, cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy((int *)b, (int *)&a[0], sizeof(int) *n, cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy((int *)c, (int *)&a[0], sizeof(int) *n, cudaMemcpyHostToDevice));
 
 	clock_t tStart = clock();
 
-	devCheckSortednessCallee << <nBlocks, nThreadsPerBlock >> >(a, n, k, b, c, d, r, l, m, o, p, sorted, 
+	devCheckSortednessCallee << <nBlocks, nThreadsPerBlock >> >((volatile int *)a_dev, n, k, (volatile int *)b, (volatile int *)c, (volatile int *)d, r, l, m, o, p, (volatile bool *)sorted,
 		log2(deviceProp.maxThreadsPerBlock), 
 		log2(deviceProp.maxGridSize[0]), log2(deviceProp.maxGridSize[1]));
 	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
@@ -300,9 +321,9 @@ void devCheckSortedness(int32_t* const a, const int n)
 	int * o_host = (int*)malloc(sizeof(int) * n);
 	int * p_host = (int*)malloc(sizeof(int) * n);
 	int * a_host = (int*)malloc(sizeof(int) * n);
-	cudaMemcpy(b_host, b, sizeof(int) * n, cudaMemcpyDeviceToHost);
-	cudaMemcpy(c_host, c, sizeof(int) * n, cudaMemcpyDeviceToHost);
-	cudaMemcpy(d_host, d, sizeof(int) * n, cudaMemcpyDeviceToHost);
+	cudaMemcpy(b_host, (const void *)b, sizeof(int) * n, cudaMemcpyDeviceToHost);
+	cudaMemcpy(c_host, (const void *)c, sizeof(int) * n, cudaMemcpyDeviceToHost);
+	cudaMemcpy(d_host, (const void *)d, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	CHECK(cudaGetLastError());
 	cudaMemcpy(&r_host, r, sizeof(int), cudaMemcpyDeviceToHost);
 	CHECK(cudaGetLastError());
@@ -314,7 +335,7 @@ void devCheckSortedness(int32_t* const a, const int n)
 	CHECK(cudaGetLastError());
 	cudaMemcpy(p_host, p, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	CHECK(cudaGetLastError());
-	cudaMemcpy(a_host, a, sizeof(int) * n, cudaMemcpyDeviceToHost);
+	cudaMemcpy(a_host, (const void *)a_dev, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	CHECK(cudaGetLastError());
 	k_host = *(thrust::max_element(thrust::host, &d_host[0], &d_host[n]));
 
@@ -326,21 +347,21 @@ void devCheckSortedness(int32_t* const a, const int n)
 	if(n<=256 || n == 4096)
 	for (int i = 0; i < n; i++)
 	{
-		cout << a_host[i] << "\t" << i << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << "\t" << l_host[i] << "\t" << o_host[i] << "\t" << m_host[i] << "\t" << p_host[i] << endl;
+		cout << i << "\t" << a[i] << "\t" << a_host[i] << "\t" << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << "\t" << l_host[i] << "\t" << o_host[i] << "\t" << m_host[i] << "\t" << p_host[i] << endl;
 	}
 	
 
-	cuFree(b);
+	cuFree((void *)b);
 	CHECK(cudaGetLastError());
-	cuFree(c);
+	cuFree((void *)c);
 	CHECK(cudaGetLastError());
-	cuFree(d);
+	cuFree((void *)d);
 	CHECK(cudaGetLastError());
 	cuFree(r);
 	CHECK(cudaGetLastError());
 	cuFree(k);
 	CHECK(cudaGetLastError());
-	cuFree(sorted);
+	cuFree((void*)sorted);
 	CHECK(cudaGetLastError());
 	cuFree(l);
 	CHECK(cudaGetLastError());
