@@ -322,7 +322,7 @@ void devCheckSortedness(int32_t* const a, const int n)
 	CHECK(cudaGetLastError());
 	std::cout << "K value: " << k_host << std::endl;
 	std::cout << "R value: " << r_host << std::endl;
-	//
+	
 	if(n<=256 || n == 4096)
 	for (int i = 0; i < n; i++)
 	{
