@@ -99,8 +99,8 @@ void hostHalve(int32_t* const a, const int radius, const int n) {
 
 } // end anonymous namespace
 
-void hostQuicksort(int32_t* const a, const int n) {
-  std::sort(a, a + n);
+void hostMergesort(int32_t* const a, const int n) {
+  std::stable_sort(a, a + n);
 }
 
 void hostBubblesort(int32_t* const a, const int n) {

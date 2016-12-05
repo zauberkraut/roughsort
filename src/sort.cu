@@ -20,12 +20,6 @@ void devMergesort(int32_t* const a, const int n) {
   cudaDeviceSynchronize();
 }
 
-void devRadixsort(int32_t* const a, const int n) {
-  thrust::device_ptr<int32_t> devA(a);
-  thrust::sort(devA, devA + n);
-  cudaDeviceSynchronize();
-}
-
 static __global__ void kernBatchSort(int32_t* const a, const int n,
                                      const int offset, const int len) {
   const int start = min(n, offset +

@@ -103,7 +103,7 @@ void runHostSortTest(void** state, void (*sort)(int32_t* const, const int)) {
 
     // perform reference sorting for comparison
     memcpy(expected, a, 4*n);
-    hostQuicksort(expected, n);
+    hostMergesort(expected, n);
 
     sort(a, n);
 
@@ -123,7 +123,7 @@ void runDevSortTest(void** state, void (*sort)(int32_t* const, const int)) {
 
     // perform reference sorting for comparison
     memcpy(expected, g_tests[i].a, 4*n);
-    hostQuicksort(expected, n);
+    hostMergesort(expected, n);
 
     sort(devA, n);
 
@@ -164,8 +164,8 @@ void testHostRough(void** state) {
                g_testRadius, ALEN(g_test22));
 }
 
-void testHostQuicksort(void** state) {
-  runHostSortTest(state, hostQuicksort);
+void testHostMergesort(void** state) {
+  runHostSortTest(state, hostMergesort);
 }
 void testHostBubblesort(void** state) {
   runHostSortTest(state, hostBubblesort);
@@ -175,9 +175,6 @@ void testHostRoughsort(void** state) {
 }
 void testDevMergesort(void** state) {
   runDevSortTest(state, devMergesort);
-}
-void testDevRadixsort(void** state) {
-  runDevSortTest(state, devRadixsort);
 }
 void testDevRoughsort(void** state) {
   // hack
@@ -195,11 +192,10 @@ int main() {
   const struct CMUnitTest tests[] = {
     cmocka_unit_test(testDevMemory),
     cmocka_unit_test(testHostRough),
-    cmocka_unit_test(testHostQuicksort),
+    cmocka_unit_test(testHostMergesort),
     cmocka_unit_test(testHostBubblesort),
     cmocka_unit_test(testHostRoughsort),
     cmocka_unit_test(testDevMergesort),
-    cmocka_unit_test(testDevRadixsort),
     cmocka_unit_test(testDevRoughsort),
   };
 
