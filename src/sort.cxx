@@ -1,5 +1,8 @@
 #include <algorithm>
 #include "roughsort.h"
+#include <iostream>
+
+long long milliseconds_now();
 
 namespace {
 
@@ -123,6 +126,8 @@ void hostBubblesort(int32_t* const a, const int n) {
 int hostRadius(const int32_t* const a, const int n) {
 	int32_t* b = new int[n];
 	int32_t* c = new int[n];
+
+	long long msNow = milliseconds_now();
 	hostLR(a, b, n);
 	hostRL(a, c, n);
 	hostDM(b, c, n);
@@ -131,6 +136,8 @@ int hostRadius(const int32_t* const a, const int n) {
 
 	delete[] b;
 	delete[] c;
+	printf("%d %d ", (int)exp2(ceil(log2(k))), k);
+	std::cout << milliseconds_now() - msNow << " ";
 	return k;
 }
 

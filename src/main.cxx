@@ -11,7 +11,6 @@
 extern char *optarg;
 extern int optind;
 
-int clock_gettime(int, timespec *spec);
 void devCheckSortedness(int32_t* const a, const int n);
 
 namespace {
@@ -34,16 +33,6 @@ namespace {
 		return l;
 	}
 
-	void getTime(timespec* start) {
-		clock_gettime(0, start);
-	}
-
-	int msSince(timespec* start) {
-		timespec time;
-		getTime(&time);
-		return (time.tv_sec - start->tv_sec) * 1000 +
-			(time.tv_nsec - start->tv_nsec) / 1.e6;
-	}
 
 	[[noreturn]] void usage() {
 		msg("roughsort [options]\n"
@@ -79,7 +68,7 @@ namespace {
 } // end anonymous namespace
 
 int main(int argc, char* argv[]) {
-	msg("Roughsort Demonstration\nA. Pfaff, J. Treadwell 2016\n");
+	//msg("Roughsort Demonstration\nA. Pfaff, J. Treadwell 2016\n");
 
 	bool runHostSorts = true;
 	int k = -1;
@@ -139,16 +128,16 @@ int main(int argc, char* argv[]) {
 	}
 
 	const size_t arraySize = 4 * (size_t)arrayLen;
-	msg("allocating storage...");
+	//msg("allocating storage...");
 	int32_t* const hostUnsortedArray = new int32_t[arrayLen];
 	int32_t* const hostSortingArray = new int32_t[arrayLen];
 	int32_t* hostReferenceArray = nullptr;
 
-	msg("%.3f MiB device RAM available, using %.3f MiB", mibibytes(cuMemAvail()),
-		mibibytes(arraySize));
+	//msg("%.3f MiB device RAM available, using %.3f MiB", mibibytes(cuMemAvail()),
+	//	mibibytes(arraySize));
 	int32_t* const devSortingArray = (int32_t*)cuMalloc(arraySize);
 
-	msg("generating a random array of %d integers...", arrayLen);
+	//msg("generating a random array of %d integers...", arrayLen);
 	const int radius = randArray(hostUnsortedArray, k, arrayLen, shuffle);
 
 	auto wrapDevRoughsort = [radius](int32_t* const a, const int n) {
@@ -163,16 +152,11 @@ int main(int argc, char* argv[]) {
 		bool runTest;
 		bool onGPU;
 	} benchmarks[] = {
-		{ "CPU Quicksort ", hostQuicksort,    runHostSorts && false, false },
-		{ "CPU Bubblesort", hostBubblesort,   runHostSorts && false, false },
-		{ "CPU Roughsort ", hostRoughsort,    runHostSorts && false, false },
-		{ "GPU Mergesort ", devMergesort,     runDevSorts && false,  true },
-		{ "GPU Radixsort ", devRadixsort,     runDevSorts && false,  true },
-		{ "GPU Roughsort ", wrapDevRoughsort, runDevSorts && false,  true },
-		{ "GPU Radius ", devCheckSortedness, runDevSorts, false}
+		{ "Host Radius ", hostRadius, true, false },
+		{ "GPU Radius ", devCheckSortedness, true, false}
 	};
 
-	msg("running sort algorithm benchmarks...");
+	//msg("running sort algorithm benchmarks...");
 
 	for (auto const bench : benchmarks) {
 		if (bench.runTest) {
@@ -185,10 +169,8 @@ int main(int argc, char* argv[]) {
 				memcpy(hostSortingArray, hostUnsortedArray, arraySize);
 			}
 
-			timespec start;
-			getTime(&start);
+
 			bench.sort(bench.onGPU ? devSortingArray : hostSortingArray, arrayLen);
-			auto ms = msSince(&start);
 
 			auto resultMsg = "";
 
@@ -197,7 +179,7 @@ int main(int argc, char* argv[]) {
 				GPU, but we probably can't afford the extra device RAM and
 				won't need the speedup. */
 				hostReferenceArray = new int32_t[arrayLen];
-				msg("copying sorted array to reference for testing further results...");
+				//msg("copying sorted array to reference for testing further results...");
 				if (bench.onGPU) {
 					cuDownload(hostReferenceArray, devSortingArray, arraySize);
 				}
@@ -248,7 +230,7 @@ int main(int argc, char* argv[]) {
 			}
 
 
-			msg("  %s took %d ms%s", bench.name, ms, resultMsg);
+			//msg("  %s took %d ms%s", bench.name, ms, resultMsg);
 		}
 	}
 

@@ -13,13 +13,13 @@
 #include "sm_20_atomic_functions.h"
 #include <iostream>
 #include <iomanip>
-
+long long milliseconds_now();
 
 using namespace std;
 
 #define CHECK(r) cuCheck(r, __FILE__, __LINE__) //TODO: get util.h created for windows branch
 inline void cuCheck(cudaError_t r, const char* fname, const size_t lnum);
-__device__ void devCheckIfSorted(volatile int32_t* a, int n, int local_id, volatile bool * sorted);
+__device__ void devCheckIfSorted(int32_t* a, int n, int local_id, bool * sorted);
 
 void devRadixsort(int32_t* const a, const int n) {
 	thrust::device_ptr<int32_t> devA(a);
@@ -74,7 +74,7 @@ void devRoughsort(int32_t* const a, const int radius, const int n) {
 }
 
 
-__global__ void downInDM(int n, volatile int * b, volatile int * c, volatile int * d)
+__global__ void downInDM(int n, int * b, int * c, int * d)
 {
 
 	const int thread_id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -86,7 +86,7 @@ __global__ void downInDM(int n, volatile int * b, volatile int * c, volatile int
 		return;
 
 	__syncthreads();
-	__threadfence();
+	//__threadfence();
 	int i = local_id;
 
 	for (int r = 0; r <= log2((double)n); r++)
@@ -99,12 +99,12 @@ __global__ void downInDM(int n, volatile int * b, volatile int * c, volatile int
 			return;
 
 		}
-		__threadfence();
+		//__threadfence();
 		__syncthreads();
 	}
 }
 
-__global__ void devCheckSortednessCallee(volatile int32_t* const a, const int n, int * k, volatile int * b, volatile int * c, volatile int * d, int * r, int * l, int * m, int * o, int * p, volatile bool * sorted, int tpbBits, int g0Bits, int g1Bits)
+__global__ void devCheckSortednessCallee(int32_t* const a, const int n, int * k, int * b, int * c, int * d, int * r, int * l, int * m, int * o, int * p, bool * sorted, int tpbBits, int g0Bits, int g1Bits)
 {
 	
 	const int thread_id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -123,17 +123,17 @@ __global__ void devCheckSortednessCallee(volatile int32_t* const a, const int n,
 	d[local_id] = 0;
 	l[local_id] = 0;
 	m[local_id] = 0;
-	__threadfence();
+	//__threadfence();
 	__syncthreads();
 
 	for (int r = 0; r < log2((double)(n)); r++)
 	{
 
 		*sorted = true;
-		__threadfence();
+		//__threadfence();
 		__syncthreads();
 		devCheckIfSorted(c, n, local_id, sorted);
-		__threadfence();
+		//__threadfence();
 		__syncthreads();
 		if (*sorted == true)
 		{
@@ -151,7 +151,7 @@ __global__ void devCheckSortednessCallee(volatile int32_t* const a, const int n,
 				p[local_id] = c[local_id];
 			}
 			c[local_id] = min(c[local_id], c[idx]);
-			__threadfence();
+			//__threadfence();
 			__syncthreads();
 		}
 	}
@@ -160,10 +160,10 @@ __global__ void devCheckSortednessCallee(volatile int32_t* const a, const int n,
 	for (int r = 0; r < log2((double)(n)); r++)
 	{
 		*sorted = true;
-		__threadfence();
+		//__threadfence();
 		__syncthreads();
 		devCheckIfSorted(b, n, local_id, sorted);
-		__threadfence();
+		//__threadfence();
 		__syncthreads();
 		if (*sorted == true)
 		{
@@ -179,7 +179,7 @@ __global__ void devCheckSortednessCallee(volatile int32_t* const a, const int n,
 
 	
 	__syncthreads();
-	__threadfence();
+	//__threadfence();
 	/*
 	if (c[local_id] < b[local_id])
 		l[local_id] = 1;
@@ -221,7 +221,7 @@ __global__ void devCheckSortednessCallee(volatile int32_t* const a, const int n,
 
 }
 
-__device__ void devCheckIfSorted(volatile int32_t* a, int n, int local_id, volatile bool * sorted)
+__device__ void devCheckIfSorted(int32_t* a, int n, int local_id, bool * sorted)
 {
 
 	if (a[local_id] > a[min(local_id + 1, n - 1)])
@@ -235,14 +235,14 @@ void devCheckSortedness(int32_t* const a, const int n)
 	cudaSetDevice(0);
 	cudaDeviceProp deviceProp;
 	cudaGetDeviceProperties(&deviceProp, 0);
-	cout << "using " << deviceProp.multiProcessorCount << " multiprocessors" << endl;
-	cout << "max threads per processor: " << deviceProp.maxThreadsPerMultiProcessor << endl;
+	//cout << "using " << deviceProp.multiProcessorCount << " multiprocessors" << endl;
+	//cout << "max threads per processor: " << deviceProp.maxThreadsPerMultiProcessor << endl;
 
 
 	unsigned long long max = n;
 	unsigned long long threadblockX = max / deviceProp.maxThreadsPerBlock > 1 ? deviceProp.maxThreadsPerBlock : max;
 	threadblockX = threadblockX == 0 ? 1 : threadblockX;
-	std::cout << "Thread block X: " << threadblockX << std::endl;
+	//std::cout << "Thread block X: " << threadblockX << std::endl;
 	//std::cout << "Max block X: " << deviceProp.maxThreadsPerBlock << std::endl;
 
 	unsigned long long threadblockY = 1;
@@ -254,22 +254,22 @@ void devCheckSortedness(int32_t* const a, const int n)
 	//calculates required grid X dimension based on the dimension available on device
 	unsigned long long gridX = max / (deviceProp.maxGridSize[0]) / threadblockX / threadblockY / threadblockZ > 1 ? deviceProp.maxGridSize[0] : max / threadblockX / threadblockY / threadblockZ + (max % (threadblockX * threadblockY * threadblockZ) > 0 ? 1 : 0);
 	gridX = gridX == 0 ? 1 : gridX;
-	std::cout << "Grid X: " << gridX << std::endl;
+	//std::cout << "Grid X: " << gridX << std::endl;
 	//std::cout << "Max Grid X: " << deviceProp.maxGridSize[0] << std::endl;
 
 	//calculates required grid Y dimension based on the dimension available on device
 	unsigned long long gridY = max / threadblockX / threadblockY / threadblockZ / gridX / deviceProp.maxGridSize[1] > 1 ? deviceProp.maxGridSize[1] : max / threadblockX / threadblockY / threadblockZ / gridX + (max % (threadblockX * threadblockY * threadblockZ * gridX) > 0 ? 1 : 0);
 	gridY = gridY == 0 ? 1 : gridY;
-	std::cout << "Grid Y: " << gridY << std::endl;
+	//std::cout << "Grid Y: " << gridY << std::endl;
 	//std::cout << "Max Grid Y: " << deviceProp.maxGridSize[1] << std::endl;
 
 	const int nThreadsPerBlock = 1024;
 	const int nBlocks = (n + nThreadsPerBlock - 1) / nThreadsPerBlock;
 
-	volatile int * a_dev = (int*)cuMalloc(sizeof(int) * n);
-	volatile int * b = (int*)cuMalloc(sizeof(int) * n);
-	volatile int * c = (int*)cuMalloc(sizeof(int) * n);
-	volatile int * d = (int*)cuMalloc(sizeof(int) * n);
+	int * a_dev = (int*)cuMalloc(sizeof(int) * n);
+	int * b = (int*)cuMalloc(sizeof(int) * n);
+	int * c = (int*)cuMalloc(sizeof(int) * n);
+	int * d = (int*)cuMalloc(sizeof(int) * n);
 
 	int * l = (int*)cuMalloc(sizeof(int) * n);
 	int * m = (int*)cuMalloc(sizeof(int) * n);
@@ -277,7 +277,7 @@ void devCheckSortedness(int32_t* const a, const int n)
 	int * p = (int*)cuMalloc(sizeof(int) * n);
 	int * r = (int*)cuMalloc(sizeof(int));
 	int * k = (int*)cuMalloc(sizeof(int));
-	volatile bool * sorted = (bool*)cuMalloc(sizeof(bool));
+	bool * sorted = (bool*)cuMalloc(sizeof(bool));
 
 
 	int r_host = 0;
@@ -289,42 +289,47 @@ void devCheckSortedness(int32_t* const a, const int n)
 	CHECK(cudaMemcpy((int *)b, (int *)&a[0], sizeof(int) *n, cudaMemcpyHostToDevice));
 	CHECK(cudaMemcpy((int *)c, (int *)&a[0], sizeof(int) *n, cudaMemcpyHostToDevice));
 
-	clock_t tStart = clock();
+	long long msNow = milliseconds_now();
 
-	devCheckSortednessCallee << <nBlocks, nThreadsPerBlock >> >((volatile int *)a_dev, n, k, (volatile int *)b, (volatile int *)c, (volatile int *)d, r, l, m, o, p, (volatile bool *)sorted,
+	devCheckSortednessCallee << <nBlocks, nThreadsPerBlock >> >((int *)a_dev, n, k, (int *)b, (int *)c, (int *)d, r, l, m, o, p, (bool *)sorted,
 		log2(deviceProp.maxThreadsPerBlock), 
 		log2(deviceProp.maxGridSize[0]), log2(deviceProp.maxGridSize[1]));
-	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
+	//printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
 	cudaThreadSynchronize();
-	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
+	//printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
 	cudaDeviceSynchronize();
-	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
+	//printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
 	downInDM << <nBlocks, nThreadsPerBlock >> >(n, b, c, d);
 
-	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
+	//printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
 	cudaThreadSynchronize();
-	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
+	//printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
 	cudaDeviceSynchronize();
-	printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
-	clock_t runtime = (double)(clock() - tStart);
-
-	cout << "K check runs in: " << setiosflags(ios::fixed)
-		<< setprecision(4)
-		<< runtime << " ticks\n";
-
+	//printf("Err: %s", cudaGetErrorString(cudaGetLastError()));
+	int * d_host = (int*)malloc(sizeof(int)* n);
+	cudaMemcpy(d_host, (const void *)d, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	int k_host;
+	k_host = *(thrust::max_element(thrust::host, &d_host[0], &d_host[n]));
+	CHECK(cudaGetLastError());
+
+	cout << milliseconds_now() - msNow << " ";
+
+	/*cout << "K check runs in: " << setiosflags(ios::fixed)
+		<< setprecision(4)
+		<< runtime << " ticks\n";*/
+
+
 	int * b_host = (int*)malloc(sizeof(int)* n);
 	int * c_host = (int*)malloc(sizeof(int)* n);
-	int * d_host = (int*)malloc(sizeof(int)* n);
+
 	int * l_host = (int*)malloc(sizeof(int)* n);
 	int * m_host = (int*)malloc(sizeof(int) * n);
 	int * o_host = (int*)malloc(sizeof(int) * n);
 	int * p_host = (int*)malloc(sizeof(int) * n);
 	int * a_host = (int*)malloc(sizeof(int) * n);
-	cudaMemcpy(b_host, (const void *)b, sizeof(int) * n, cudaMemcpyDeviceToHost);
-	cudaMemcpy(c_host, (const void *)c, sizeof(int) * n, cudaMemcpyDeviceToHost);
-	cudaMemcpy(d_host, (const void *)d, sizeof(int) * n, cudaMemcpyDeviceToHost);
-	CHECK(cudaGetLastError());
+	//cudaMemcpy(b_host, (const void *)b, sizeof(int) * n, cudaMemcpyDeviceToHost);
+	//cudaMemcpy(c_host, (const void *)c, sizeof(int) * n, cudaMemcpyDeviceToHost);
+
 	cudaMemcpy(&r_host, r, sizeof(int), cudaMemcpyDeviceToHost);
 	CHECK(cudaGetLastError());
 	cudaMemcpy(l_host, l, sizeof(int) * n, cudaMemcpyDeviceToHost);
@@ -336,19 +341,19 @@ void devCheckSortedness(int32_t* const a, const int n)
 	cudaMemcpy(p_host, p, sizeof(int) * n, cudaMemcpyDeviceToHost);
 	CHECK(cudaGetLastError());
 	cudaMemcpy(a_host, (const void *)a_dev, sizeof(int) * n, cudaMemcpyDeviceToHost);
-	CHECK(cudaGetLastError());
-	k_host = *(thrust::max_element(thrust::host, &d_host[0], &d_host[n]));
+	//CHECK(cudaGetLastError());
 
 
+
 	CHECK(cudaGetLastError());
-	std::cout << "K value: " << k_host << std::endl;
-	std::cout << "R value: " << r_host << std::endl;
+	std::cout << "par:" << exp2((double)ceil((double)log2((double)k_host))) << " " << k_host<< " ";
+	//std::cout << "R value: " << r_host << std::endl;
 	
-	if(n<=256 || n == 4096)
-	for (int i = 0; i < n; i++)
-	{
-		cout << i << "\t" << a[i] << "\t" << a_host[i] << "\t" << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << "\t" << l_host[i] << "\t" << o_host[i] << "\t" << m_host[i] << "\t" << p_host[i] << endl;
-	}
+	//if(n<=256 || n == 4096 )
+	//for (int i = 0; i < n; i++)
+	//{
+	//	cout << i << "\t" << a[i] << "\t" << a_host[i] << "\t" << b_host[i] << "\t" << c_host[i] << "\t" << d_host[i] << "\t" << l_host[i] << "\t" << o_host[i] << "\t" << m_host[i] << "\t" << p_host[i] << endl;
+	//}
 	
 
 	cuFree((void *)b);

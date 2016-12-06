@@ -106,7 +106,7 @@ void randInit(bool forceMT) {
 		randInt = rdRand;
 	}
 	else { // fall back on the C++ MT generator and seed it
-		warn("Your CPU is old and an embarrassment; falling back on mt19937");
+		//warn("Your CPU is old and an embarrassment; falling back on mt19937");
 		randInt = mtRand;
 	}
 }
@@ -149,7 +149,7 @@ int randArray(int32_t* const a, const int k, const int n, bool shuffle) {
 		}
 	}
 	const int radius = hostRadius(a, n);
-	printf("random array is %d-sorted\n", radius);
+	//printf("random array is %d-sorted\n", radius);
 	if (radius != k && k > -1) {
 		fatal("...but we needed it %d-sorted!", k);
 	}
