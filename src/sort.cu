@@ -34,20 +34,14 @@ void devRoughsort(int32_t* const a, const int radius, const int n) {
   if (radius == 0) {
     return;
   }
-  const int blockDim = 512;
+  const int blockDim = 1024;
 
-  cudaError_t r;
-  int k = radius, p = 0;
-  do {
-    const int len = k << 1;
-    const int nSegments = (n + len - 1)/len;
-    const int nBlocks = (nSegments + blockDim-1)/blockDim;
-    kernBatchSort<<<nBlocks, blockDim>>>(a, n, 0, len);
-    kernBatchSort<<<nBlocks, blockDim>>>(a, n, k, len);
-    r = cudaGetLastError();
-
-    k = radius / (2 << p++);
-  } while (k > 1 && r == cudaSuccess);
+  const int len = radius << 1;
+  const int nSegments = (n + len - 1)/len;
+  const int nBlocks = (nSegments + blockDim-1)/blockDim;
+  kernBatchSort<<<nBlocks, blockDim>>>(a, n, 0, len);
+  kernBatchSort<<<nBlocks, blockDim>>>(a, n, radius, len);
+  cudaError_t r = cudaGetLastError();
 
   if (r != cudaSuccess) {
     printf("KERNEL ERROR: %s\n", cudaGetErrorString(r));
