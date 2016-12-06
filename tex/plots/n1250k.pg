@@ -1,0 +1,14 @@
+set terminal latex size 8.5, 6
+set output "n1250k.tex"
+
+set xlabel "$k$"
+set ylabel "(ms)" offset 3
+set format xy "$%g$"
+set logscale y
+set key top left spacing 2.5
+
+plot "n1250k.dat" using 2:xtic(1) title "   Seq. Mergesort"  with linespoints lt 1 pt 5, \
+     ""           using 3         title "   Seq. Roughsort"  with linespoints lt 1 pt 7, \
+     ""           using 4         title "   Par. Mergesort"  with linespoints lt 2 pt 4, \
+     ""           using 5         title "   Par. Roughsort"  with linespoints lt 2 pt 6, \
+     ""           using 6         title "   Seq. Bubblesort" with linespoints lt 2 pt 3
