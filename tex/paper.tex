@@ -3,6 +3,8 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage[doublespacing]{setspace}
+\usepackage{graphicx}
+\usepackage{standalone}
 \title{Parallel Sorting of Roughly-Sorted Sequences\\CSCI 5172 Fall '16 Project}
 \author{Anthony Pfaff, Jason Treadwell}
 
@@ -31,6 +33,16 @@ We intend to study and implement sorting of roughly-sorted sequences using both 
 I propose to develop implementations of the method using C and Nvidia's CUDA framework, comparing the results with sequential
   implementations running on both the GPU and CPU as well as with the classic Mergesort and Quicksort algorithms. If time
   permits, I would also like to compare the method to parallel versions of the latter two algorithms.
+
+The aforementioned algorithms assume a specific underlying memory in achieving the provided parallel implementation runtimes: the concurrent-read concurrent-write parallel random access model (CRCW PRAM).  Shiloach and Vishkin elaborate on this memory model, providing that it is a purely theoretical model which, inter alia, meets the following criteria: a shared, global memory of size m > p is available to p processors, and up to p positions in this memory may be simultaneously read or written in one step\cite{Shiloach1981}.  As with roughsort, a number of algorithms take advantage of this model’s assumptions to provide efficiency improvements over their serial counterparts\cite{Shiloach1982}\cite{raj1989}.
+
+Conspicuous, however, with these and other CRCW PRAM algorithms is a lack of presented implementations.  The model is merely that, and thus implementing such an algorithm requires a suitable proxy which shares the characteristics of CRCW PRAM.  In contemporary computing, there are most notable such proxy is graphics processing unit (GPU) parallelization.
+
+GPUs flip invert core principles of general purpose computing to yield a performance improvement on specific workloads.   
+
+Given many GPU processor cores may update multiple memory locations simultaneously, and likewise many memory location may be read in parallel on GPU, the underlying NVIDIA hardware that CUDA provides access to is reminiscent of CRCW PRAM.  However, GPUs differ from true CRCW PRAM in fundamental ways.  First, GPU memory is finite, while PRAM is of arbitrary size.  Furthermore, for GPU memory access times to provide the concurrent read and write characteristics reminiscent of PRAM, these memory operations must be performed on contiguous portions of GPU memory, whereas CRCW PRAM has no such ordering limitation.  Foremost in the differences between CRCW PRAM and GPU architectures however is the warp divergence concept addressed above.  What this implies for memory operations is that workloads exist which may prevent all but one thread in a warp from performing a memory operation at a particular time.  Consequently, there are practical limitations to what a GPU may achieve, and these limitations restrict the workloads which are practical to run on a GPU.  Not only must a GPU workload access constrain its memory usage within practical limitations, the accesses to that memory must be orderly, and the underlying algorithm performing those accesses must be amenable to parallelization on GPU if the advantages of GPU processing over CPU processing are to be realized\cite{dehne2010}.
+
+\input{C:/Users/Anthony/Source/Repos/blah/roughsort/tex/plots/seqpar100}
 
 \bibliographystyle{plain}
 \nocite{*}
