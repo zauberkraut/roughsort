@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
 			break;
 
 		case 'm':
-			msg("forcing usage of software RNG");
+			//msg("forcing usage of software RNG");
 			forceMT = true;
 			break;
 
@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
 			break;
 
 		case 's':
-			msg("random array shuffling enabled");
+			//msg("random array shuffling enabled");
 			shuffle = true;
 			break;
 
@@ -152,9 +152,10 @@ int main(int argc, char* argv[]) {
 		bool runTest;
 		bool onGPU;
 	} benchmarks[] = {
-		{ "Host Radius ", hostRadius, true, false },
-		{ "GPU Radius ", devCheckSortedness, true, false}
+		{ "CPU Radius!!! ", hostRadius,    runHostSorts, false },
+		{ "GPU Roughsort ", wrapDevRoughsort, runDevSorts,  true },
 	};
+
 
 	//msg("running sort algorithm benchmarks...");
 

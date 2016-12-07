@@ -1,8 +1,9 @@
+/* sort.cxx: Sequential pure-CPU sorting routines. */
+
 #include <algorithm>
 #include "roughsort.h"
-#include <iostream>
-
-long long milliseconds_now();
+#include <ctime>
+//#include <unistd.h>
 
 namespace {
 
@@ -101,8 +102,8 @@ namespace {
 
 } // end anonymous namespace
 
-void hostQuicksort(int32_t* const a, const int n) {
-	std::sort(a, a + n);
+void hostMergesort(int32_t* const a, const int n) {
+	std::stable_sort(a, a + n);
 }
 
 void hostBubblesort(int32_t* const a, const int n) {
@@ -127,38 +128,16 @@ int hostRadius(const int32_t* const a, const int n) {
 	int32_t* b = new int[n];
 	int32_t* c = new int[n];
 
-	long long msNow = milliseconds_now();
+	clock_t start = clock();
 	hostLR(a, b, n);
 	hostRL(a, c, n);
 	hostDM(b, c, n);
 
 	const int k = hostDM(b, c, n);
+	int ms = (int)(((int64_t)(clock() - start)) * 1000 / CLOCKS_PER_SEC);
+	printf("%d ", ms);
 
 	delete[] b;
 	delete[] c;
-	printf("%d %d ", (int)exp2(ceil(log2(k))), k);
-	std::cout << milliseconds_now() - msNow << " ";
 	return k;
-}
-
-/* Sequential roughsort implementation. */
-void hostRoughsort(int32_t* const a, const int n) {
-	const int radius = hostRadius(a, n);
-
-	if (!radius || n < 2) {
-		return;
-	}
-	if (radius == 1) {
-		oneSort(a, n);
-		return;
-	}
-
-	typedef void(*halveFunc)(int32_t* const, const int, const int);
-	halveFunc halve = n%radius ? (halveFunc)hostHalve : (halveFunc)hostHalveEasy;
-
-	int k = radius, p = 0;
-	do {
-		halve(a, k, n);
-		k = radius / (2 << p++);
-	} while (k > 1);
 }
