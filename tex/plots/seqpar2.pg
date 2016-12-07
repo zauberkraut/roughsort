@@ -1,0 +1,10 @@
+set terminal latex size 8.5, 6
+set output "seqpar2.tex"
+
+set xlabel "$n$"
+set ylabel "(ms)" offset 0
+set format xy "$%g$"
+set key top left spacing 2.5
+
+plot "seqpar2.dat" using 2:xtic(1) title "   Seq. Radius" with linespoints lt 1 pt 7, \
+     ""            using 3         title "   Par. Radius" with linespoints lt 1 pt 6
