@@ -1,11 +1,13 @@
 \documentclass[letterpaper, 12pt]{article}
 \usepackage[letterpaper]{geometry}
-\usepackage{amsmath}
-\usepackage{amssymb}
+\usepackage{amsmath, amssymb, url, rotating, sectsty, indentfirst}
 \usepackage[doublespacing]{setspace}
-\usepackage{url, rotating, sectsty}
+\usepackage[strings]{underscore}
 
 \sectionfont{\fontsize{12}{15}\selectfont}
+
+\let\supercite\cite
+\renewcommand{\cite}[1]{\textnormal{~\supercite{#1}}}
 
 \title{Parallel Sorting of Roughly-Sorted Sequences\\CSCI 5172 Fall '16 Project}
 \author{Anthony Pfaff, Jason Treadwell}
@@ -13,22 +15,104 @@
 \begin{document}
 \maketitle
 
-\section{The Array Sorting Problem}
+Roughsort is a sorting algorithm that exploits the \textit{radius} of a sequence to beat the linearithmic
+  lower runtime bound of the comparison sort family of algorithms.
+Its structure invites implementation using parallel execution.
+Here we present a parallel Roughsort implementation using Nvidia's CUDA platform for heterogeneous GPGPU programming and
+  interpret our results.
 
-Sorting a collection according to some ordering among its items is among the most classic problems of computer science.
-A well-established result is the linearithmic  (i.e.\ $O(n \lg n)$) optimal upper bound for sorting sequences of length $n$ by
-  comparison.
+\section{The Array Sorting Problem}
+Sorting the elements of an array is among the most classic problems of computer science, often
+  considered to be the most fundamental algorithmic problem\cite{clrs}.
+Not merely just for arranging data to make it easier to read, sorting algorithms are frequently employed to render graphics
+  and to improve the performance of other algorithms (e.g., set intersection or finding the unique elements of a list).
+
+The \textit{comparison} sorts are an indispensible family of sorting algorithms containing such classics as Heapsort,
+  Mergesort and Quicksort.
+True to its name, algorithms in this family determine how to reorder a sequence by comparing its elements against each other
+  according to some natural or explicitly-provided ordering;
+  for the sake of simplicity, we shall only consider the sorting of integral elements in nondecreasing order, backed by
+  random-access array storage\footnote{Sequential-access storage demands distinct and divergent design considerations.}.
+A well-established result is the ``linearithmic'' $\Omega(n \lg n)$ runtime lower bound for the general problem of sorting
+  an array of $n$ elements by comparison; algorithms such as Mergesort achieve $\Theta(n \lg n)$ runtime (and are thus
+  asymptotically optimal) whereas Quicksort, while usually outperforming Mergesort over arrays that fit in memory,
+  has quadratic-runtime pathological cases.
+
+Comparison-based sorting algorithms, such as Mergesort, often have divide-and-conquer structures that can easily and
+  substantially be sped up by using \textit{nested parallelism} and other means of parallel execution\cite{clrs}.
 
 \section{Sorting Roughly-Sorted Sequences}
+The optimal $\Omega(n \lg n)$ runtime bound of comparison sorting can be beaten when additional analysis is performed on the
+  input sequence\cite{clrs}.
+An algorithm by Altman and Igarashi, which we call \textit{Roughsort}, improves upon this lower bound by exploiting the degree
+  to which the unprocessed input array is partially sorted\cite{altman89}.
+Specifically, Roughsort sorts an array in $\Theta(n \lg k)$ time, where $k$ is the \textit{radius} of the input sequence.
 
-We can exploit the ordering of \textit{roughly-sorted} sequences to sort them in $O(n \lg k)$ time, where $k$ is the
-  \textit{radius} of a sequence $S$ or the smallest $k$ such that $S$ is $k$-\textit{sorted}.\cite{altman89}
-A $k$-sorted sequence $\{a_0, a_1, \cdots, a_n\}$ satisfies $a_i \leq a_j \;\forall\; 1 \leq i \leq j \leq n, i \leq j - k$.
-Since an unsorted sequence can be at most $n$-sorted, the worst-case runtime of this algorithm has complexity $O(n \lg n)$.
+A sequence $A = \{a_0, a_1, \cdots, a_{n-1}\}$ is $k$-sorted if it satisfies
+$$a_i \leq a_j \,,\quad i < j - k \quad\forall\; 0 \leq i \leq j \leq n-1\,,$$
+where a 0-sorted sequence is fully-sorted.
+The radius of $A$ is the smallest such $k$ for which $A$ is $k$-sorted.
+Alternatively, and perhaps more usefully, the radius of $A$ measures how far away its most out-of-order element is from its
+  position in the fully-sorted array:
+$$\text{radius}(A) = \max\{j - i \mid j > i,\, a_i > a_j \} \,.$$
+
+Roughsort exploits the radius of $A$ by using a \textit{halving} algorithm that takes a $2l$-sorted sequence and partially
+  sorts it into an $\lfloor l - 1 \rfloor$-sorted sequence.
+By repeatedly halving the sortedness of $A$, we fully sort it in $\lg k$ runs, whence the runtime.
+The radius of $A$ must therefore be given \textit{a priori} or determined from the input
+  in order to effectively perform the algorithm.
+
+Some applications involve sorted arrays that are updated or extended in such a way as to only slightly perturb the ordering
+  (i.e., the radius $k$ of an out-of-order sequence is small)\cite{altman89}.
+In such cases, Roughsort could be employed to quickly resort the sequences faster than by using a full $\Theta(n \lg n)$
+  comparison sort.
+Since an unsorted sequence of length $n$ can be at most $(n - 1)$-sorted, the runtime of Roughsort is
+  $\Theta(n \lg k) = O(n \lg n)$ and is thus asymptotically-optimal among comparison-based sorting algorithms.
+
+Similar to other comparison sorts, Roughsort has divide-and-conquer characteristics that support parallel execution on various
+  multiprocessor models\cite{altman89, altman90}.
 
 \section{Sequential Implementation}
+As noted, Roughsort must know the radius $k$ of the input array $A = \{a_0, a_1, \cdots, a_{n-1}\}$
+  in order to completely sort it.
+If not known, the radius can be determined in linear time\cite{altman89}, preserving the $\Theta(n \lg k)$ complexity of the
+  algorithm.
 
-\section{Sorting Arrays in Parallel}
+To determine the radius, we must first compute the $LR(A) = \{b_i\}$ and $RL(A) = \{c_i\}$ \textit{characteristic sequences}:
+$$b_i = \max\{a_0, a_1, \cdots, a_i\}\,, \quad c_i = \min\{a_i, a_{i+1}, \cdots, a_{n-1}\}\,, \quad 0 \leq i < n$$
+Both sequences are easily computed in linear time and space using simple min/max prefix scans.
+Note that $c_i \leq b_i \;\forall\; i$.
+By performing a linear-time scan of these sequences and observing where they ``cross'' each other, we can compute
+  the \textit{disorder measure} sequence $DM(A) = \{d_i\}$, where each $d_i$ represents how displaced $a_i$ is from its position
+  in the sorted ordering of the elements of $A$:
+$$d_i = \max\big\{\{i - j \mid c_i < b_j\} \cup \{0\} \big\}$$
+
+The radius of $A$ is thus the maximum element from $DM(A)$. We employ a modification of the $DM$ algorithm from
+  \supercite{altman89} where we save memory by simply keeping track of the maximum-encountered $d_i$ instead of storing the
+  entire sequence; our sequential radius determination algorithm thus runs in linear time and requires $2n = \Theta(n)$ space.
+
+The core of the sequential Roughsort implementation is the aforementioned radius halving algorithm from \supercite{altman89}.
+This algorithm halves the radius $k$ of $A$ in place through the following three steps:
+\begin{enumerate}
+\item Partition each consecutive run of $k$ elements in $A$ about the mean of the run.
+\item Starting at element $a_{\lfloor k/2 \rfloor}$ to stagger the partitions, repeat step 1 and go to 3.
+\item Repeat step 1 and halt.
+\end{enumerate}
+A run of elements is ``partitioned'' by partially sorting it such that no element before the median of the run exceeds
+  the median and no element thereafter is less than it.
+We partition each run using the \texttt{nth_element} function from the  C\texttt{++} STL, which performs an optimized,
+  linear-time selection algorithm such as Introselect\footnote{Introselect is based on Quickselect, which resembles a Quicksort
+  that searches for the $n$th element of the sorted array by only partitioning one side of each pivot.}\cite{selectalg}.
+
+Our sequential implementation thus sorts the array $A$ in place by determining its radius $k$ and halving the radius
+  $\lg k$ times, in total requiring linear space and taking $\Theta(3(n/k \cdot k) \lg k) = \Theta(n \lg k)$ time.
+
+The halving algorithm fails to halve the radius of $1$-sorted sequences, since it's impossible to stagger their radial runs;
+  our implementation thus performs a single linear Bubblesort scan to quickly sort such sequences.
+
+For an analysis of the sequential implementation's runtime performance, please see Section 7.
+
+\section{Parallel Acceleration Using CUDA}
 
 \section{Parallel Radius Determination}
 
@@ -50,6 +134,8 @@ Since an unsorted sequence can be at most $n$-sorted, the worst-case runtime of 
 
 \clearpage
 \section{Parallel Roughsort Implementation and Results}
+
+rand shuffling
 
 \begin{sidewaysfigure}
 \input{plots/k2}
@@ -86,7 +172,7 @@ Since an unsorted sequence can be at most $n$-sorted, the worst-case runtime of 
 \clearpage
 \section{Explanation of Results}
 
-\section{Conclusion}
+\section{Conclusion and Further Research}
 
 \clearpage
 \bibliographystyle{plain}
