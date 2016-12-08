@@ -111,11 +111,13 @@ Our sequential implementation thus sorts the array $A$ in place by determining i
 The halving algorithm fails to halve the radius of $1$-sorted sequences, since it's impossible to stagger their radial runs;
   our implementation thus performs a single linear Bubblesort scan to quickly sort such sequences.
 
-For an analysis of the sequential implementation's runtime performance, please see Section 7.
+For an analysis of the sequential implementation's runtime performance, please see Section 9.
 
 \section{Parallel Acceleration Using CUDA}
 
 \section{Parallel Radius Determination}
+
+\section{Radius Determination Runtime Analysis}
 
 \begin{sidewaysfigure}
 \input{plots/seqpar2}
@@ -180,7 +182,7 @@ While the threads in each launch run concurrently\footnote{For large arrays, the
 In contrast to \supercite{altman90}, we used Thrust's radix sort instead of its Mergesort implementation in order to leverage
   the linear runtime of the former.
 While this approach to the parallel Roughsort was far more successful than the previous, it still competed more poorly than
-  its competitors (see Section 7).
+  its competitors (see Section 9).
 
 \section{Random $k$-Sorted Sequence Generation}
 We developed a $k$-sorted random sequence generator to test our implementations.
