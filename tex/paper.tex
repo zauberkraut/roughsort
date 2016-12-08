@@ -27,7 +27,7 @@ Sorting the elements of an array is among the most classic problems of computer 
 Not merely just for arranging data to make it easier to read, sorting algorithms are frequently employed to render graphics
   and to improve the performance of other algorithms (e.g., set intersection or finding the unique elements of a list).
 
-The \textit{comparison} sorts are an indispensible family of sorting algorithms containing such classics as Heapsort,
+The \textit{comparison} sorts are an indispensable family of sorting algorithms containing such classics as Heapsort,
   Mergesort and Quicksort.
 True to its name, algorithms in this family determine how to reorder a sequence by comparing its elements against each other
   according to some natural or explicitly-provided ordering;
@@ -93,7 +93,7 @@ The radius of $A$ is thus the maximum element from $DM(A)$. We employ a modifica
 
 The core of the sequential Roughsort implementation is the aforementioned radius halving algorithm from \supercite{altman89}.
 This algorithm halves the radius $k$ of $A$ in place through the following three steps:
-\begin{enumerate}
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
 \item Partition each consecutive run of $k$ elements in $A$ about the mean of the run.
 \item Starting at element $a_{\lfloor k/2 \rfloor}$ to stagger the partitions, repeat step 1 and go to 3.
 \item Repeat step 1 and halt.
@@ -101,7 +101,8 @@ This algorithm halves the radius $k$ of $A$ in place through the following three
 A run of elements is ``partitioned'' by partially sorting it such that no element before the median of the run exceeds
   the median and no element thereafter is less than it.
 We partition each run using the \texttt{nth_element} function from the  C\texttt{++} STL, which performs an optimized,
-  linear-time selection algorithm such as Introselect\footnote{Introselect is based on Quickselect, which resembles a Quicksort
+  linear-time selection algorithm\cite{clrs} such as
+  Introselect\footnote{Introselect is based on Quickselect, which resembles a Quicksort
   that searches for the $n$th element of the sorted array by only partitioning one side of each pivot.}\cite{selectalg}.
 
 Our sequential implementation thus sorts the array $A$ in place by determining its radius $k$ and halving the radius
@@ -135,7 +136,69 @@ For an analysis of the sequential implementation's runtime performance, please s
 \clearpage
 \section{Parallel Roughsort Implementation and Results}
 
-rand shuffling
+We first attempted to implement the parallel approach described in \supercite{altman89}.
+This approach follows the sequential version from Section 3, except in that the segment partitions are all launched in parallel
+  at each of the 3 steps, synchronizing between steps.
+We employed Nvidia's \textit{Thrust} library, which provides parallel CUDA implementations of the C\texttt{++} STL.
+
+Regrettably, Thrust has yet to provide an \texttt{nth_element} selection algorithm implementation, so we replaced it with calls
+  to Thrust's \texttt{sort} algorithm, which performs a ``state-of-the-art'', highly-optimized radix sort
+  implementation when invoked over arrays of primitive integer elements\cite{thrustradix, leischner09}.
+Radix sort is a generalized counting sort that runs in linear time when operating over fixed-size array elements.
+While radix sort requires additional storage (unlike Introselect, which was used in the sequential implementation), this
+  additional storage ought to be acceptable as the segments we wish to partition ought to be relatively small.
+
+Each Thrust \texttt{sort} call issues at least one kernel launch; we attempted to run radix sorts over the entire array in
+  parallel by establishing a fixed number of CUDA \textit{streams}.
+Whereas kernels launched through the same stream are executed in order, up to 16 kernels launched through distinct streams can be
+  run concurrently on the GPU, available resources permitting\cite{cuda}.
+We established a fixed number of CUDA streams and launched each \texttt{sort} call through them in a circular, round-robin
+  fashion.
+
+Unfortunately, while this implementation was very simple to code and correctly sorted its input, it was thousands of times
+  slower than the sequential implementation.
+Running the implementation through CUDA's \texttt{nvvp} provider showed that the \texttt{sort} calls weren't being launched in
+  parallel as expected, possibly due to some non-obvious synchronization mechanism that made concurrent launches of this
+  function impossible.
+
+We then implemented the parallel Roughsort approach described in \supercite{altman90}, which prescribes the parallel Mergesort
+  algorithm by Cole in lieu of weak partitions and is implemented as follows for sorting the array $A$ with radius $k$ in place:
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+\item In parallel, sort all consecutive runs of $2k$ elements in $A$.
+\item Repeat step 1, but begin the first run at $a_k$; halt.
+\end{enumerate}
+
+Unlike the sequential algorithm, this approach employs full sorting of the array segments and thus needs only two batches of
+  sorts without intra-radial staggering.
+Furthermore, just a single iteration of this process suffices to fully sort the $k$-sorted input.
+
+We implemented this approach using a CUDA kernel where each thread in the launch is responsible for sorting exactly one segment
+  from step 1 or 2; the steps are divided into separate kernel launches, each given an offset from which begin segmenting the
+  array.
+While the threads in each launch run concurrently\footnote{For large arrays, the GPU can't host every thread simultaneously and
+  must sequentially execute the thread blocks in batches.}, each thread sorts its designated segment sequentially.
+In contrast to \supercite{altman90}, we used Thrust's radix sort instead of its Mergesort implementation in order to leverage
+  the linear runtime of the former.
+While this approach to the parallel Roughsort was far more successful than the previous, it still competed more poorly than
+  its competitors (see Section 7).
+
+\section{Random $k$-Sorted Sequence Generation}
+We developed a $k$-sorted random sequence generator to test our implementations.
+The generator takes $k$ and the length of the desired array $n$ as arguments (specified by the user on the command line) and
+  allocates a contiguous array of $n$ 32-bit random integers.
+In order to avoid pseudorandom statistical weaknesses, we sourced these random integers from the high-end,
+   cryptographically-secure hardware random number generator included in recent Intel processors\cite{intel12}.
+
+We $k$-sort the random array $A$ by fully sorting it using the C\texttt{++} STL before perturbing the sorted elements.
+This perturbance is achieved by randomly choosing sorted elements $a_p, a_q$ such that $q - p = k$ in order to guarantee the
+  $k$-sortedness of the sequence.
+To increase the rigor of the randomized $k$-sorting, each consecutive, disjoint run of at most $k + 1$ array elements
+  (excluding $a_p$ and $a_q$) is then randomly shuffled to produce a random subarray that is itself at most $k$-sorted.
+
+\section{Implementation Performance Analysis}
+mergesort speedup
+upload times
+ignore rad gen
 
 \begin{sidewaysfigure}
 \input{plots/k2}
