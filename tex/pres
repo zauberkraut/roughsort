@@ -1,1 +1,1 @@
-pdflatex pres && bibtex pres && pdflatex pres && pdflatex pres && evince pres.pdf
+pdflatex pres && evince pres.pdf

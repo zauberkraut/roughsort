@@ -1,10 +1,10 @@
 \documentclass[10pt, xcolor={dvipsnames}, aspectratio=169]{beamer}
-\usefonttheme[onlymath]{serif}
 \usepackage[utf8]{inputenc}
 \usepackage[super, square]{natbib}
 \usepackage{mathtools, relsize, graphicx, amssymb, amsthm}
 \usepackage{listings}
 \usepackage{color}
+\usepackage[strings]{underscore}
 
 \lstset{
     frame=single,
@@ -23,7 +23,7 @@
 \title{Parallel Sorting of Roughly-Sorted Sequences}
 \author{Anthony Pfaff, Jason Treadwell}
 \institute{CSCI 5172 $|$ CU Denver $|$ Fall '16}
-\date{11.??.2016}
+\date{12.10.2016}
 
 \begin{document}
 \setbeamertemplate{navigation symbols}{} %remove navigation symbols
@@ -40,19 +40,187 @@
 \begin{frame}
 \transfade
 \frametitle{Introduction}
-% TODO: rewrite this
-Sorting a collection according to some ordering among its items is among the most classic problems of computer science.
-A well-established result is the linearithmic  (i.e.\ $O(n \lg n)$) optimal upper bound for sorting sequences of length $n$ by
-  comparison.
+Sorting a sequence according to some ordering is a foundational problem of computer science. \newline
+
+Sorting has crucial and non-obvious applications. There exist a great many such algorithms. \newline
+
+The optimal runtime of sorting a sequence of length $n$ by \textit{comparison} is $\Theta(n \lg n)$.
 \end{frame}
 
 \begin{frame}
-\frametitle{References}
-\smaller[1]{\bibliography{refs}}
+\frametitle{Sort Algorithms}
+The comparison sorts include Mergesort, Heapsort, Quicksort, etc.\ and have diverse strengths. \newline
+
+The former two are asymptotically optimal; Quicksort frequently outruns them, but is $O(n^2)$. \newline
+
+We can beat the linearithmic runtime bounds through additional analysis of the input array.
 \end{frame}
 
 \begin{frame}
-\frametitle{Demo}
+\frametitle{Roughly-Sorted Sequences}
+The sequence $A = \{a_0, a_1, \cdots, a_{n-1}\}$ is $k$-sorted if it satisfies
+$$a_i \leq a_j \quad\forall\; i < j - k\,,\quad 0 \leq i \leq j < n \,.$$ \newline
+
+The radius of $A$ is the smallest $k$ such that $A$ is $k$-sorted:
+$$\text{radius}(A) = \max\{j - i \mid j > i,\, a_i > a_j \} \,.$$
+\end{frame}
+
+\begin{frame}
+\frametitle{Conventions}
+We'll only consider sequences of 32-bit integers backed by \textit{random-access arrays}. \newline
+
+The array $A = \{a_0, a_1, \cdots, a_{n-1}\}$ is \textit{sorted} if its elements are all ordered in nondecreasing order. \newline
+
+When we say $A$ is $k$-sorted, we imply that $k$ is minimal (i.e., the radius of $A$ is $k$).
+\end{frame}
+
+\begin{frame}
+\frametitle{Roughly-Sorted Sequences (cont.)}
+Some applications involve sorted arrays that become slightly perturbed. \newline
+
+We might be able to exploit their partial sortedness to beat the $\Omega(n \lg n)$ lower runtime bound. \newline
+
+Comparison-based sorts are prone to divide-and-conquer and, therefore, opportunities for parallel speedup.
+\end{frame}
+
+\begin{frame}
+\frametitle{Roughsort}
+Roughsort exploits the presortedness of the array $A$ by applying a radius \textit{halving} algorithm. \newline
+
+The algorithm sorts $A$ by halving its radius $\lg k$ times in runtime $\Theta(n \lg k) = O(n \lg n)$. \newline
+
+Roughsort does invite parallel speedup, yet must determine $k$ to effectively sort $A$.
+\end{frame}
+
+\begin{frame}
+\frametitle{Determining the Radius}
+Using min/max prefix scans, we compute the \textit{characteristic sequences} of $A$:
+$$LR(A) = \{b_i\}\,,\quad RL(A) = \{c_i\}\,,\quad 0 \leq i < n\,,$$
+$$b_i = \max\{a_0, a_1, \cdots, a_i\}\,,\quad c_i = \min\{a_i, a_{i+1}, \cdots, a_{n-1}\}\,.$$
+
+The radius $k$ of $A$ is the maximum element from the \textit{disorder measure} of $A$:
+$$DM(A) = \{d_i\}\,,\quad d_i = \max\big\{\{i - j \mid c_i < b_j\} \cup \{0\} \big\}\,,\quad k = \max DM(A) \,.$$
+
+Finding $k$ thus takes linear time and space, preserving the $\Theta(n \lg k)$ complexity of Roughsort.
+\end{frame}
+
+\begin{frame}
+\frametitle{Halving the Radius}
+\begin{enumerate}
+\item Partition each consecutive run of $k$ elements in $A$ about the mean of the run.
+\item Starting at element $a_{\lfloor k/2 \rfloor}$ to stagger the partitions, repeat step 1 and go to 3.
+\item Repeat step 1 and halt.
+\end{enumerate}
+
+Each partition is performed using STL's \texttt{nth_element()} and takes linear time. \newline
+
+Our sequential implementation thus sorts $A$ in place by halving its radius $\lg k$ times, taking linear space and
+  $\Theta(3(n/k \cdot k) \lg k) = \Theta(n \lg k)$ time.
+\end{frame}
+
+% BEGIN CUDA INTRO
+\begin{frame}
+\frametitle{}
+\end{frame}
+
+\begin{frame}
+\frametitle{}
+\end{frame}
+% END CUDA INTRO
+
+% BEGIN PAR RADIUS
+\begin{frame}
+\frametitle{}
+\end{frame}
+
+\begin{frame}
+\frametitle{}
+\end{frame}
+% END PAR RADIUS
+
+% BEGIN PAR RADIUS RESULTS
+\begin{frame}
+\frametitle{}
+\end{frame}
+
+\begin{frame}
+\frametitle{}
+\end{frame}
+% END PAR RADIUS RESULTS
+
+\begin{frame}
+\frametitle{Parallel Roughsort: Failed Approach}
+Our first implementation simply parallelized the halving algorithm of our sequential Roughsort. \newline
+
+We replaced \texttt{nth_element()} with Thrust's \texttt{sort()}, an optimized radix sort. \newline
+
+We tried to launch every partitioning in parallel using \textit{streams} and got abysmal results.
+\end{frame}
+
+\begin{frame}
+\frametitle{Parallel Roughsort: Better Approach}
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+\item In parallel, \textbf{sort} all consecutive runs of $2k$ elements in $A$.
+\item Repeat step 1, but begin the first run at $a_k$; halt.
+\end{enumerate}
+This process sorts each segment and needs only a single iteration to fully sort $A$. \newline
+
+We implemented it as a CUDA kernel where the array segments were divided up among many parallel threads,
+  but each thread sequentially sorted its designated array segment.
+\end{frame}
+
+\begin{frame}
+\frametitle{Testing the Implementation}
+We tested our Roughsort implementations against sequential and parallel Mergesort as well as against Bubblesort. \newline
+
+Each test generated a random $k$-sorted array for some given $k$ and length $n$, then fed it to all five algorithms, averaging
+  their results over eight runs. Each array was sourced by a hardware RNG and sorted before being
+  $k$-perturbed and shuffled. \newline
+
+The tests were run on a workstation with a high-end, quad-core Xeon CPU as well as a high-end, consumer-grade
+  Nvidia GeForce 1080 GTX GPU suitable for workloads over 32-bit array elements.
+\end{frame}
+
+\begin{frame}
+\frametitle{Sort Runtimes $(k = 2)$}
+\begin{figure}
+\scalebox{0.4}{\input{plots/k2}}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Sort Runtimes $(k = 15)$}
+\begin{figure}
+\scalebox{0.4}{\input{plots/k15}}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Sort Runtimes $(n = 0.75 \cdot 10^6)$}
+\begin{figure}
+\scalebox{0.4}{\input{plots/n750k}}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+\frametitle{Sort Runtimes $(n = 1.25 \cdot 10^6)$}
+\begin{figure}
+\scalebox{0.4}{\input{plots/n1250k}}
+\end{figure}
+\end{frame}
+
+% BEGIN EXPLANATION OF BAD PAR. PERFORMANCE
+\begin{frame}
+\frametitle{}
+\end{frame}
+
+\begin{frame}
+\frametitle{}
+\end{frame}
+% END EXPLANATION OF BAD PAR. PERFORMANCE
+
+\begin{frame}
+\frametitle{Conclusion and Further Research}
 \end{frame}
 
 \end{document}

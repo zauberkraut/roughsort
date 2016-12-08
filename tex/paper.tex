@@ -49,7 +49,7 @@ An algorithm by Altman and Igarashi, which we call \textit{Roughsort}, improves 
 Specifically, Roughsort sorts an array in $\Theta(n \lg k)$ time, where $k$ is the \textit{radius} of the input sequence.
 
 A sequence $A = \{a_0, a_1, \cdots, a_{n-1}\}$ is $k$-sorted if it satisfies
-$$a_i \leq a_j \,,\quad i < j - k \quad\forall\; 0 \leq i \leq j \leq n-1\,,$$
+$$a_i \leq a_j \quad\forall\; i < j - k \,,\quad 0 \leq i \leq j < n\,,$$
 where a 0-sorted sequence is fully-sorted.
 The radius of $A$ is the smallest such $k$ for which $A$ is $k$-sorted.
 Alternatively, and perhaps more usefully, the radius of $A$ measures how far away its most out-of-order element is from its
