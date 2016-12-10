@@ -80,7 +80,7 @@ Some applications involve sorted arrays that become slightly perturbed. \newline
 
 We might be able to exploit their partial sortedness to beat the $\Omega(n \lg n)$ lower runtime bound. \newline
 
-Comparison-based sorts are prone to divide-and-conquer and, therefore, opportunities for parallel speedup.
+Comparison-based sorts are prone to divide-and-conquer and rife with opportunities for parallel speedup.
 \end{frame}
 
 \begin{frame}
@@ -191,7 +191,7 @@ Organization
 
 Threads, blocks, and grid all have identifiers
 \newline\newline
-Developer references these identfiers in code
+Developer references these identifiers in code
 \newline\newline
 Using an understanding of how work is to be divided up among threads, these identifiers can inform a thread what work it needs to do
 
@@ -210,9 +210,9 @@ Back to parallel Roughsort: we know we can find the radius in parallel.  Merely 
 \newline\newline
 Straightforward for $LR$ list, slightly less so for $RL$, least straightforward for $DM$.
 \newline\newline
-Eventually settled on a $DM$ list determination based on the sequential, with array indicies fixed to thread ID.
+Eventually settled on a $DM$ list determination based on the sequential, with array indices fixed to thread ID.
 \newline\newline
-Added an efficient method to check for full array sortness as part of the $RL$ and $LR$ list components.
+Added an efficient method to check for full array sortedness as part of the $RL$ and $LR$ list components.
 \end{frame}
 
 
@@ -242,7 +242,7 @@ Testing:
 	\newline\newline
 	Resolved this by realizing only need our "radius" to approximate the real $k$ value, in that we just need the next power of two greater
 	\newline\newline
-	Added \texttt{Thrust max_element} code to find the greatst value in the $DM$ list, thus yielding our radius
+	Added \texttt{Thrust max_element} code to find the greatest value in the $DM$ list, thus yielding our radius
 \end{frame}
 % END PAR RADIUS
 
