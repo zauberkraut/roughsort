@@ -1,422 +1,70 @@
 \documentclass[letterpaper, 12pt]{article}
 \usepackage[letterpaper]{geometry}
-\usepackage{amsmath, amssymb, url, rotating, sectsty, indentfirst}
+\usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage[doublespacing]{setspace}
-\usepackage[strings]{underscore}
-
-\sectionfont{\fontsize{12}{15}\selectfont}
-
-\let\supercite\cite
-\renewcommand{\cite}[1]{\textnormal{~\supercite{#1}}}
-
+\usepackage{graphicx}
+\usepackage{standalone}
+\usepackage{url}
 \title{Parallel Sorting of Roughly-Sorted Sequences\\CSCI 5172 Fall '16 Project}
 \author{Anthony Pfaff, Jason Treadwell}
 
 \begin{document}
 \maketitle
 
-Roughsort is a sorting algorithm that exploits the \textit{radius} of a sequence to beat the linearithmic
-  lower runtime bound of the comparison sort family of algorithms.
-Its structure invites implementation using parallel execution.
-Here we present a parallel Roughsort implementation using Nvidia's CUDA platform for heterogeneous GPGPU programming and
-  interpret our results.
+% TODO: rewrite away the proposal text
+Sorting a collection according to some ordering among its items is among the most classic problems of computer science.
+A well-established result is the linearithmic  (i.e.\ $O(n \lg n)$) optimal upper bound for sorting sequences of length $n$ by
+  comparison.
+Commonly-used sorting algorithms such as Mergesort and Quicksort have $\Theta(n \lg n)$ and $\Omega(n \lg n)$ runtimes,
+  respectively.
 
-\section{The Array Sorting Problem}
-Sorting the elements of an array is among the most classic problems of computer science, often
-  considered to be the most fundamental algorithmic problem\cite{clrs}.
-Not merely just for arranging data to make it easier to read, sorting algorithms are frequently employed to render graphics
-  and to improve the performance of other algorithms (e.g., set intersection or finding the unique elements of a list).
+We can exploit the ordering of \textit{roughly-sorted} sequences to sort them in $O(n \lg k)$ time, where $k$ is the
+  \textit{radius} of a sequence $S$ or the smallest $k$ such that $S$ is $k$-\textit{sorted}.\cite{altman89}
+A $k$-sorted sequence $\{a_0, a_1, \cdots, a_n\}$ satisfies $a_i \leq a_j \;\forall\; 1 \leq i \leq j \leq n, i \leq j - k$.
+Since an unsorted sequence can be at most $n$-sorted, the worst-case runtime of this algorithm has complexity $O(n \lg n)$.
 
-The \textit{comparison} sorts are an indispensable family of sorting algorithms containing such classics as Heapsort,
-  Mergesort and Quicksort.
-True to its name, algorithms in this family determine how to reorder a sequence by comparing its elements against each other
-  according to some natural or explicitly-provided ordering;
-  for the sake of simplicity, we shall only consider the sorting of integral elements in non-decreasing order, backed by
-  random-access array storage\footnote{Sequential-access storage demands distinct and divergent design considerations.}.
-A well-established result is the ``linearithmic'' $\Omega(n \lg n)$ runtime lower bound for the general problem of sorting
-  an array of $n$ elements by comparison; algorithms such as Mergesort achieve $\Theta(n \lg n)$ runtime (and are thus
-  asymptotically optimal) whereas Quicksort, while usually outperforming Mergesort over arrays that fit in memory,
-  has quadratic-runtime pathological cases.
+We intend to study and implement sorting of roughly-sorted sequences using both sequential and parallel\cite{altman90} versions
+  of the algorithm. In particular, I shall investigate the applicability of the method over very large sequences,
+  accelerated using graphics hardware. A GPU is dedicated graphics hardware that also excels at performing frequent, basic
+  computations over large amounts of data. The use of GPUs for numerical applications is a recent and rapidly-growing development
+  in computer science and software engineering. Suitable hardware is now commonly available in consumer devices and may herald a
+  paradigm shift in how we efficiently perform common and indispensable tasks like sorting.
 
-Comparison-based sorting algorithms, such as Mergesort, often have divide-and-conquer structures that can easily and
-  substantially be sped up by using \textit{nested parallelism} and other means of parallel execution\cite{clrs}.
+I propose to develop implementations of the method using C and Nvidia's CUDA framework, comparing the results with sequential
+  implementations running on both the GPU and CPU as well as with the classic Mergesort and Quicksort algorithms. If time
+  permits, I would also like to compare the method to parallel versions of the latter two algorithms.
 
-\section{Sorting Roughly-Sorted Sequences}
-The optimal $\Omega(n \lg n)$ runtime bound of comparison sorting can be beaten when additional analysis is performed on the
-  input sequence\cite{clrs}.
-An algorithm by Altman and Igarashi, which we call \textit{Roughsort}, improves upon this lower bound by exploiting the degree
-  to which the unprocessed input array is partially sorted\cite{altman89}.
-Specifically, Roughsort sorts an array in $\Theta(n \lg k)$ time, where $k$ is the \textit{radius} of the input sequence.
+The aforementioned algorithms assume a specific underlying memory in achieving the provided parallel implementation runtimes: the concurrent-read concurrent-write parallel random access model (CRCW PRAM).  Shiloach and Vishkin elaborate on this memory model, providing that it is a purely theoretical model which, inter alia, meets the following criteria: a shared, global memory of size m\textgreater p is available to p processors, and up to p positions in this memory may be simultaneously read or written in one step\cite{Shiloach1981}.  As with roughsort, a number of algorithms take advantage of this model\textquoteright s assumptions to provide efficiency improvements over their serial counterparts\cite{Shiloach1982}\cite{raj1989}.
 
-A sequence $A = \{a_0, a_1, \cdots, a_{n-1}\}$ is $k$-sorted if it satisfies
-$$a_i \leq a_j \quad\forall\; i < j - k \,,\quad 0 \leq i \leq j < n\,,$$
-where a 0-sorted sequence is fully-sorted.
-The radius of $A$ is the smallest such $k$ for which $A$ is $k$-sorted.
-Alternatively, and perhaps more usefully, the radius of $A$ measures how far away its most out-of-order element is from its
-  position in the fully-sorted array:
-$$\text{radius}(A) = \max\{j - i \mid j > i,\, a_i > a_j \} \,.$$
+Conspicuous, however, with these and other CRCW PRAM algorithms is a lack of presented implementations.  The model is merely that, and thus implementing such an algorithm requires a suitable proxy which shares the characteristics of CRCW PRAM.  In contemporary computing, the most notable such proxy is graphics processing unit (GPU) parallelization.
 
-Roughsort exploits the radius of $A$ by using a \textit{halving} algorithm that takes a $2l$-sorted sequence and partially
-  sorts it into an $\lfloor l - 1 \rfloor$-sorted sequence.
-By repeatedly halving the sortedness of $A$, we fully sort it in $\lg k$ runs, whence the runtime.
-The radius of $A$ must therefore be given \textit{a priori} or determined from the input
-  in order to effectively perform the algorithm.
+GPUs invert a core principle of general purpose computing to yield a performance improvement on specific workloads.  Rather than having one or a handful of general purpose, powerful multiprocessors, GPUs opt for a different model: many less powerful, special purpose processors.  Contemporary examples include [Jason's CPU information ] on a CPU, versus [Jason's GPU information] on a GPU.  
 
-Some applications involve sorted arrays that are updated or extended in such a way as to only slightly perturb the ordering
-  (i.e., the radius $k$ of an out-of-order sequence is small)\cite{altman89}.
-In such cases, Roughsort could be employed to quickly resort the sequences faster than by using a full $\Theta(n \lg n)$
-  comparison sort.
-Since an unsorted sequence of length $n$ can be at most $(n - 1)$-sorted, the runtime of Roughsort is
-  $\Theta(n \lg k) = O(n \lg n)$ and is thus asymptotically-optimal among comparison-based sorting algorithms.
+Nvidia--the manufacturuer of the aforemeitoned graphics card--makes available an API suite and SDK which allows developers to readily access the GPU: CUDA.  This platform provides developers a simple interface with which they can offload processing of CUDA-augmented C/C++ software payloads to CUDA-supported Nvidia cards.
 
-Similar to other comparison sorts, Roughsort has divide-and-conquer characteristics that support parallel execution on various
-  multiprocessor models\cite{altman89, altman90}.
+The parallelism provided by Nvidia and CUDA in this scheme can be realized by developers who develop their payloads in specific ways.  Fundamentally, programs running on an Nvidia card via CUDA operate differently than their  CPU counterparts.  In general, a line of code executing on an Nvidia card is not processed in isolation.  Rather, the Nvidia CUDA scheme provides for single instruction, multiple thread (SIMT) execution, as opposed to the usual single instruction, single data scheme (SISD) provided by general purpose CPUs.  In contrast to a single instruction accessing or updating one memory location as the result of one instruction executing on a single core of a general purpose CPU, a single instruction executing on an Nvidia card is executing inside multiple threads on multiple respective cores simultaneously, each of which operates on a different location in memory.
 
-\section{Sequential Implementation}
-As noted, Roughsort must know the radius $k$ of the input array $A = \{a_0, a_1, \cdots, a_{n-1}\}$
-  in order to completely sort it.
-If not known, the radius can be determined in linear time\cite{altman89}, preserving the $\Theta(n \lg k)$ complexity of the
-  algorithm.
+When a developer wants to take advantage of this parallelism, they structure their code such that the multiple results of the same instruction executing with values from different memory locations is a useful component of the overall program's payload.  Nvidia CUDA provides simple mechanisms by which to achieve this.
 
-To determine the radius, we must first compute the \textit{characteristic sequences} $LR(A) = \{b_i\}$ and $RL(A) = \{c_i\}$:
-$$b_i = \max\{a_0, a_1, \cdots, a_i\}\,, \quad c_i = \min\{a_i, a_{i+1}, \cdots, a_{n-1}\}\,, \quad 0 \leq i < n$$
-Both sequences are easily computed in linear time and space using simple min/max prefix scans.
-Note that $c_i \leq b_i \;\forall\; i$.
-By performing a linear-time scan of these sequences and observing where they ``cross'' each other, we can compute
-  the \textit{disorder measure} sequence $DM(A) = \{d_i\}$, where each $d_i$ represents how displaced $a_i$ is from its position
-  in the sorted ordering of the elements of $A$:
-$$d_i = \max\big\{\{i - j \mid c_i < b_j\} \cup \{0\} \big\}$$
+The core component of an Nvidia payload is a thread; an instance of the series of instructions in the overall CUDA payload.  Multiple threads run in a group called a block.  Blocks contain a developer-specified number of threads each.  Between threads and blocks is the concept of a warp.  Warps are collections of 32 threads executing simultaneously on the same processor core on the Nvidia card.  Usually, all threads in a warp are executing the same instruction simultaneously. However, in situations where a conditional is evaluated by members of a warp, all threads for whom the conditional yields true will execute, and subsequently all threads with a false conditional result will execute, in a phenomenon called warp divergence.  This yields from the SIMT architecture, where all cores on which a warp executes must be processing the same instruction or temporarily switched off and not processing at all.  Blocks are divvyed up into multiple warps for scheduling and execution on an Nvidia GPU.  Collections of these blocks are referred to as a grid.  Finally, encompassing all of these components is the kernel.  Kernels are the series of instructions which threads, warps, blocks, and grids comprise an instance of and represent the sequence of code to actually be transferred to and executed on GPU.
 
-The radius of $A$ is thus the maximum element from $DM(A)$. We employed a modification of the $DM$ algorithm from
-  \supercite{altman89} where we save memory by simply keeping track of the maximum-encountered $d_i$ instead of storing the
-  entire sequence; our sequential radius determination algorithm thus runs in linear time and requires $2n = \Theta(n)$ space.
+Nvidia provides a simple mechanism by which developers can access the parallelism provided by CUDA.  Each of the above divisions of the CUDA payload are provided with an identifier.  A tuple composed of the thread, block, and grid identifiers\footnote{Concerns with warps are abstracted away from the developer.  Consequently warp identifiers are not needed and are not available.} uniquely identifies that component of the workload.  Using this information, individual threads all executing the same instruction (such as a memory read from an array) can perform that instruction on distinct data (access different memory locations in the array).\cite{nvidiaguide}
 
-The core of the sequential Roughsort implementation is the aforementioned radius halving algorithm from \supercite{altman89}.
-This algorithm halves the radius $k$ of $A$ in place through the following three steps:
-\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
-\item Partition each consecutive run of $k$ elements in $A$ about the mean of the run.
-\item Starting at element $a_{\lfloor k/2 \rfloor}$ to stagger the partitions, repeat step 1 and go to 3.
-\item Repeat step 1 and halt.
-\end{enumerate}
-A run of elements is ``partitioned'' by partially sorting it such that no element before the median of the run exceeds
-  the median and no element thereafter is less than it.
-We partition each run using the \texttt{nth_element} function from the  C\texttt{++} STL, which implements an optimized,
-  linear-time selection algorithm\cite{clrs} such as
-  Introselect\footnote{Introselect is based on Quickselect, which resembles a Quicksort
-  that searches for the $n$th element of the sorted array by only partitioning one side of each pivot.}\cite{selectalg}.
+Using these techniques provided a platform to develop the GPU parallel versions of sequence radius finding and subsequent roughsorting.  In support of the above discussed parallel roughsort implementation, CUDA implementations of the RL, LR, and DM sequences were developed.  This was done by assigning each thread a unique identifier and then, analagous to Altman and Chlebus\textquoteright work, having each thread manage the corresponding slot in the global unsorted array \cite{altman89}.  Each thread performed the parallel min- then max-prefix operations until the respective lists were efficiently determined ordered.  Sorting was determined by having each thread determine if its assigned slot in the LR or RL list was greater than the next element in the list, and having each thread globally assert any true (unsorted) result to global memory, available to all other threads.
 
-Our sequential implementation thus sorts the array $A$ in place by determining its radius $k$ and halving the radius
-  $\lg k$ times, in total requiring linear space and taking $\Theta(3(n/k \cdot k) \lg k) = \Theta(n \lg k)$ time.
+Once the RL and LR lists were completed, the DM list was computed by using Altman et. al.\textquoteright s serial radius techniques, while using the log(n) bounded techniques introduced by their RL and LR sequence determination algorithms.  However, a notable divergence from the serial version of the serial DM list algorithm was taken.  The inner loop of the serial DM list algorithm added a criteria which assured that B[i] (the ith element of the LR list) was always greater than or equal to C[i] (the ith element of the RL list).  As discussed, only the power of 2 greater than the actual value of k is actually needed for parallel roughsort to function, so this criteria was removed in the interest of efficiency and simplicity\cite{altman89}.
 
-The halving algorithm fails to halve the radius of $1$-sorted sequences, since it's impossible to stagger their radial runs;
-  our implementation thus performs a single linear Bubblesort scan to quickly sort such sequences.
+Finally, to determine the radius from the DM list, the maximum element needed to be found.  For this purpose, the Thrust CUDA library was used, which provides CUDA-optimized implementations of a number of C++ Standard Template Library (STL) functions\cite{thrust}.  One such STL function is the std::max\textunderscore element function.  Using the Thrust implementation of this function, maximum elements of large arrays can be found expediently on Nvidia hardware using CUDA\cite{extrema}.  Using this function yielded the maximum element of the DM list, which is k.  Further, to ensure all values quiesced during LR, RL, and DM list computations, a separate kernel was launched to perform the final DM computations.
 
-For an analysis of the sequential implementation's runtime performance, please see Section 9.
+Running these kernels yielded disappointing results, however.  For random lists composed together in such a manner as to yield a specific k value for the list\footnote{Lists which had a specific k value were generated ahead of time and then evaluated using the raidus finders to prove both correctness and provide for validity in this experimentation}, sequential CPU computations exceeded performance on GPU for all values of k beyond 6.\footnote{These results reversed when performed in a Windows environment, compiled with Visual Studio 2015 Community and run on commodity hardware.  The authors suspect this to be a false result and suspect that optimization differences on the C++ STL nth\textunderscore element function are the cause.  This begets further investigation, however}  Various performance results are reported below.
 
-\section{Parallel Acceleration Using CUDA}
+[graphs here]
 
-  Parallel implementations of the Roughsort and radius finding algorithms are also addressed.  The aforementioned algorithms 
-  assume a specific underlying memory in achieving the subsequent parallel implementation runtimes: the concurrent-read 
-  concurrent-write parallel random access model (CRCW PRAM).  Shiloach and Vishkin elaborate on this memory model, providing
-  that it is a purely theoretical model which, \textit{inter alia}, meets the following criteria: a shared, global memory of
-  size $m \geq p$ is available to $p$ processors, and up to $p$ positions in this memory may be simultaneously read or written
-  in one step\cite{shiloach1981}.  As with Roughsort, a number of algorithms take advantage of this model\textquoteright s 
-  assumptions to provide performance improvements over their serial counterparts\cite{shiloach1982}\cite{raj1989}.
+The source papers theorized the converse result, so this result must then be explained.  There are several possible reasons for this which should be considered, as there are similartities but also differences between GPU and the assumed CRCW PRAM.  Given many GPU processor threads may update multiple memory locations simultaneously, and likewise many memory location may be read in parallel on GPU, the underlying NVIDIA hardware that CUDA provides access to is reminiscent of CRCW PRAM.  However, GPUs differ from true CRCW PRAM in fundamental ways.  First, GPU memory is finite, while PRAM is of arbitrary size.  Furthermore, for GPU memory access times to provide the concurrent read and write characteristics reminiscent of PRAM, these memory operations must be performed on contiguous portions of GPU memory, whereas CRCW PRAM has no such ordering limitation.  Foremost in the differences between CRCW PRAM and GPU architectures however is the warp divergence concept addressed above.  What this implies for memory operations is that workloads exist which may prevent all but one thread in a warp from performing a memory operation at a particular time.  Consequently, there are practical limitations to what a GPU may achieve, and these limitations restrict the workloads which are practical to run on a GPU.  Not only must a GPU workload access constrain its memory usage within practical limitations, the accesses to that memory must be orderly, and the underlying algorithm performing those accesses must be amenable to parallelization on GPU if the advantages of GPU processing over CPU processing are to be realized\cite{dehne2010exploring}.  
 
-  Conspicuous, however, with these and other CRCW PRAM algorithms is a lack of presented implementations.  The model is merely
-  that, and thus implementing such an algorithm requires a suitable proxy which shares the characteristics of CRCW PRAM.  In 
-  contemporary computing, the most notable such proxy is graphics processing unit (GPU) parallelization.
+\input{C:/Users/Anthony/Source/Repos/blah/roughsort/tex/plots/seqpar100}
 
-  GPUs invert a core principle of general purpose computing to yield a performance improvement on specific workloads.  Rather
-  than having one or a handful of general purpose, powerful multiprocessors, GPUs opt for a different model: many less-powerful,
-  special purpose processors.  Contemporary examples include the Skylake Intel Xeon E3-1275 v5 CPU and the Nvidia GTX 1080 
-  GPU\footnote{Both were used on this project, for the evaluation of sequential and parallel implementations of these algorithms,
-  respectively.}. The Xeon has 4 processor cores whereas the Nvidia card has 2560 cores \cite{xeon} \cite{geforce}.
-
-  Nvidia\textemdash the manufacturer of the aforementioned graphics card\textemdash makes available an API suite and SDK which
-  allows developers to readily access the GPU: CUDA.  This platform provides developers a simple interface with which they can
-  offload processing of CUDA-augmented C\texttt{++} software payloads to CUDA-supported Nvidia cards.
-
-  The parallelism provided by Nvidia and CUDA in this scheme can be realized by developers who develop their payloads in specific
-  ways.  Fundamentally, programs running on an Nvidia card via CUDA operate differently than their  CPU counterparts.  In general,
-  a line of code executing on an Nvidia card is not processed in isolation.  Rather, the Nvidia CUDA scheme provides for single 
-  instruction, multiple thread (SIMT) execution, as opposed to the usual single instruction, single data scheme (SISD) provided by
-  general purpose CPUs.  In contrast to a single instruction accessing or updating one memory location as the result of one 
-  instruction executing on a single core of a general purpose CPU, a single instruction executing on an Nvidia card is executing 
-  inside multiple threads on multiple respective cores simultaneously, each of which operates on a different location in memory.
-
-  When a developer wants to take advantage of this parallelism, they structure their code such that the multiple results of the same
-  instruction executing with values from different, largely contiguous memory locations is a useful component of the overall 
-  program's payload.  Contiguity is an important caveat, due to the way memory accesses in Nvidia cards are structured.  Effective
-  memory bandwidth is significantly reduced when memory accesses are not grouped in such a manner as to take advantage of the 
-  architecture, reducing memory bandwidth by over 90\% on even higher-end Nvidia cards \cite{coalesce}. Memory access which complies
-  with this constraint is said to have \textit{coalescence}.
-
-  The core component of an Nvidia payload is a thread; an instance of the series of instructions in the overall CUDA payload.
-  Multiple threads run in a group called a block.  Blocks contain a developer-specified number of threads each.  Between threads and
-  blocks is the concept of a warp.  Warps are collections of 32 threads executing simultaneously on separate processor cores of the
-  Nvidia card.  Usually, all threads in a warp are executing the same instruction simultaneously. However, in situations where a 
-  conditional is evaluated by members of a warp, all threads for whom the conditional yields true will execute, and subsequently all
-  threads with a false conditional result will execute (or vice versa), in a phenomenon called \textit{warp divergence}.  This yields
-  from the SIMT architecture, where all cores on which a warp executes must be processing the same instruction or temporarily 
-  switched off and not processing at all.  Blocks are divided up into multiple warps for scheduling and execution on an Nvidia GPU.
-  Collections of these blocks are referred to as a grid.  Finally, encompassing all of these components is the kernel.  Kernels are 
-  the series of instructions which threads, warps, blocks, and grids comprise an instance of and represent the sequence of code to 
-  actually be transferred to and executed on GPU.
-
-  Nvidia provides a simple mechanism by which developers can access the parallelism provided by CUDA.  Each of the above divisions of 
-  the CUDA payload are provided with an identifier.  A tuple composed of the thread, block, and grid identifiers\footnote{Concerns with
-  warps are abstracted away from the developer.  Consequently warp identifiers are not needed and are not available.} uniquely 
-  identifies that component of the workload.  Using this information, individual threads all executing the same instruction (such as a
-  memory read from an array) can perform that instruction on distinct data (access different memory locations in the array) \cite{cuda}.
-
-
-\section{Parallel Radius Determination}
-
-  In achieving parallel radius finding, Altman and Chlebus noted that the $LR$, $RL$, and $DM$ sequences necessary to determine the 
-  radius $k$ of a roughsorted sequence could be computed in $O(\lg k)$, while $k$ is again at most $n - 1$ \cite{altman90}, with the 
-  above underlying assumptions.
-
-  Using CUDA as a proxy for CRCW PRAM, its techniques provided a platform to develop the GPU parallel versions of sequence radius finding
-  and subsequent roughsorting.  
-  
-  In support of the above discussed parallel Roughsort implementation, CUDA implementations of the $RL$, $LR$, and $DM$ sequence determination
-  algorithms were developed.  This was done by assigning each thread a unique identifier and then, analogous to Altman and Chlebus\textquoteright
-  work, having each thread manage the corresponding slot in the global unsorted array \cite{altman89}.  Each thread performed the parallel min- 
-  then max-prefix operations until the respective lists were efficiently determined ordered.  Sorting was determined by having each thread 
-  determine if its assigned slot in the $LR$ or $RL$ list was greater than the next element in the list, and having each thread globally assert
-  any true (unsorted) result to global memory, available to all other threads.
-
-  Once the $RL$ and $LR$ lists were completed, the $DM$ list was computed by using Altman and Chlebus\textquoteright s serial radius techniques,
-  while using the $O(\lg k)$ bounded techniques introduced by their $RL$ and $LR$ sequence determination algorithms.  However, a notable divergence
-  from the serial version of the serial $DM$ list algorithm was taken.  The inner loop of the serial $DM$ list algorithm added a criteria which 
-  assured that $LR[i]$ (the $i$th element of the $LR$ list) was always greater than or equal to $RL[i]$ (the $i$th element of the $RL$ list).  
-  Only the power of 2 greater than the actual value of $k$ is needed for parallel Roughsort to function, so this criteria was removed in the 
-  interest of efficiency and simplicity\cite{altman89}.
-
-  Finally, to determine the radius from the $DM$ list, the maximum element needed to be found.  For this purpose, the \textit{Thrust} CUDA library
-  was used, which provides CUDA-optimized implementations of a number of C\texttt{++} STL functions\cite{thrust}.  One such STL function is the 
-  \texttt{max\textunderscore element} function.  Using the \textit{Thrust} implementation of this function, maximum elements of large arrays can 
-  be found expediently on Nvidia hardware using CUDA\cite{extrema}.  Using this function yielded the maximum element of the $DM$ list, which is 
-  \textit{k}.  Further, to ensure all values quiesced during $LR$, $RL$, and $DM$ list computations, a separate kernel was launched to perform 
-  the final $DM$ computations.
-
-\section{Radius Determination Runtime Analysis}
-
-  Running these kernels yielded disappointing results, however.  Figures 1 and 2 compare the runtime of the sequential algorithm to the parallel.
-  For random lists composed together in such a manner as to yield a specific $k$ value for the list (as discussed later in the paper)
-  \footnote{Lists which had a specific \textit{k} value were generated ahead of time and then evaluated using the radius finders to prove both
-  correctness and provide for validity in this experimentation}, sequential CPU computations exceeded performance on GPU for any tested $n$ when
-  values of $k$ exceeded 6, as see in Figure 2\footnote{These results reversed when performed in a Windows environment, compiled with Visual 
-  Studio 2015 Community and run on commodity hardware.  The authors suspect this to be a false result and posit that optimization differences on
-  the C\texttt{++} STL \texttt{nth\textunderscore element} function are the cause.  This invites further investigation, however.}.  Figure 1 
-  reports more positive results for $k$ equal to 2, showing that parallel run times were equalled or exceeded by sequential runtimes for tested 
-  values $n$ equal to or in excess of 150,000, though this result was at best constant factor improvement over the sequential implementation and
-  does not demonstrate the expected $O(\lg k)$ runtime, emphasizing a more fundamental issue with the platform, implementation, or both.
-
-\begin{sidewaysfigure}
-\input{plots/seqpar2}
-\vspace{-4ex}
-\caption{\label{fig:seqpar2}{\em
-  Radius Determination Runtimes over Arrays of Length $n\cdot 10^6$, $k = 2$
-}}
-\end{sidewaysfigure}
-
-\begin{sidewaysfigure}
-\input{plots/seqpar100}
-\vspace{-4ex}
-\caption{\label{fig:seqpar100}{\em
-  Radius Determination Runtimes over Arrays of Length $n\cdot 10^6$, $k = 100$
-}}
-\end{sidewaysfigure}
-
-\clearpage
-\section{Parallel Roughsort Implementation and Results}
-
-We first attempted to implement the parallel Roughsort described in \supercite{altman89}.
-This approach follows the sequential version from Section 3, except in that the segment partitions are all launched in parallel
-  at each of the 3 steps, synchronizing between steps.
-We employed Nvidia's \textit{Thrust} library, which provides a parallel CUDA implementation of the C\texttt{++} STL.
-
-Regrettably, \texttt{Thrust} has yet to provide an \texttt{nth_element} selection algorithm implementation, so we replaced it with calls
-  to \texttt{Thrust}'s \texttt{sort} algorithm, which performs a ``state-of-the-art'', highly-optimized radix sort
-  implementation when invoked over arrays of primitive integer elements\cite{thrustradix, leischner09}.
-Radix sort is a generalized counting sort that runs in linear time when operating over fixed-size array elements.
-While radix sort requires additional storage (unlike Introselect, which was used in the sequential implementation), this
-  additional storage ought to be acceptable as the segments we wish to partition ought to be relatively small.
-
-Each \texttt{Thrust} \texttt{sort} call issues at least one kernel launch; we attempted to run radix sorts over the entire array in
-  parallel by establishing a fixed number of CUDA \textit{streams}.
-Whereas kernels launched through the same stream are executed in order, up to 16 kernels launched through distinct streams can be
-  run concurrently on the GPU, available resources permitting\cite{cuda}.
-We established a fixed number of CUDA streams and launched each \texttt{sort} call through them in a circular, round-robin
-  fashion.
-
-Unfortunately, while this implementation was very simple to code and correctly sorted its input, it was thousands of times
-  slower than the sequential implementation.
-Running the implementation through CUDA's \texttt{nvvp} profiler showed that the \texttt{sort} calls weren't being launched in
-  parallel as expected, possibly due to some non-obvious synchronization mechanism that made concurrent launches of this
-  function impossible.
-
-We then implemented the parallel Roughsort approach described in \supercite{altman90}, which prescribes the parallel Mergesort
-  algorithm by Cole in lieu of weak partitioning and is implemented as follows for sorting the array $A$ with radius $k$ in
-  place:
-\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
-\item In parallel, sort all consecutive runs of $2k$ elements in $A$.
-\item Repeat step 1, but begin the first run at $a_k$; halt.
-\end{enumerate}
-
-Unlike the sequential algorithm, this approach fully sorts each array segment and thus needs only two batches of
-  sorts without intra-radial staggering.
-Furthermore, just a single iteration of this process suffices to fully sort the $k$-sorted input.
-
-We implemented this approach using a CUDA kernel where each thread in the launch is responsible for sorting exactly one segment
-  from step 1 or 2; the steps are divided into separate kernel launches, each given an offset from which begin segmenting the
-  array.
-While the threads in each launch run concurrently\footnote{For large arrays, the GPU can't host every thread simultaneously and
-  must sequentially execute the thread blocks in batches.}, each thread sorts its designated segment sequentially.
-In contrast to \supercite{altman90}, we used \texttt{Thrust}'s radix sort instead of its Mergesort implementation in order to leverage
-  the linear runtime of the former.
-While this approach to the parallel Roughsort was far more successful than the previous, it still struggled against
-  its competitors (see Section 9).
-
-\section{Random $k$-Sorted Sequence Generation}
-We developed a $k$-sorted random sequence generator to test our implementations.
-The generator takes $k$ and the length of the desired array $n$ as arguments (specified by the user on the command line) and
-  allocates a contiguous array of $n$ 32-bit random integers.
-In order to avoid pseudorandom statistical weaknesses, we sourced these random integers from the high-end,
-   cryptographically-secure hardware random number generator included in recent Intel processors\cite{intel12}.
-
-We $k$-sort the random array $A$ by fully sorting it using the C\texttt{++} STL before perturbing the sorted elements.
-This perturbance is achieved by randomly choosing sorted elements $a_p, a_q$ such that $q - p = k$ in order to guarantee the
-  $k$-sortedness of the sequence.
-To increase the rigor of the randomized $k$-sorting, each consecutive, disjoint run of at most $k + 1$ array elements
-  (excluding $a_p$ and $a_q$) is then randomly shuffled to produce a random subarray that is itself at most $k$-sorted.
-
-\section{Implementation Performance Analysis}
-We tested our sequential and parallel Roughsort implementations against sequential and parallel Mergesort (as implemented by
-  the C\texttt{++} STL and by CUDA \texttt{Thrust}, respectively) as well as against our simple, sequential Bubblesort implementation.
-We chose Mergesort since it's a classic sort algorithm that also scales very well with parallel execution, capable
-  of achieving a speedup of at least $\Theta(n / \lg^2 n)$ when given unlimited processors for a runtime of
-  $\Theta(\lg^3 n)$\cite{clrs}.
-While Bubblesort has a quadratic runtime upper bound, its lightweight, linear lower bound emerges when given nearly-sorted
-  sequences and provides a means of comparing our implementation's performance for small values of $k$.
-
-All tests were run on a workstation sporting a high-end, quad-core Intel CPU as well as an Nvidia GeForce GTX 1080---a
-  recent and high-end\footnote{At the time of this writing.}, consumer-grade GPU suitable for heavy computational workloads
-  over 32-bit values.
-
-The time needed to transfer data to the GPU prior to running the parallel sorts isn't counted in the runtime results, since we'd
-  expect such sorting operations to run as part of larger GPU workloads and not in isolation.
-Since our parallel radius determiner wasn't complete until late in development and ran slower than the sequential
-  implementation over arrays with larger radii, our parallel Roughsort implementation used the sequential implementation to
-  compute $k$, the runtime of which wasn't figured into the results.
-
-Figures 3 and 4 compare all five sorting algorithms, varying $n$ while fixing $k$ to 2 and 15, respectively. Roughsort ought
-  to have a runtime advantage with the smaller radius that dissipates as we increase $k$.
-Figures 5 and 6 invert the axes and vary $k$ while fixing $n$ at $750 \cdot 10^3$ and $1.25 \cdot 10^6$, respectively. 
-For each tested $(n, k)$, all five sorters were run over the same, $k$-sorted random array of length $n$; their runtimes were
-  averaged over eight such runs.
-The runtime axis is logarithmic in every graph.
-
-Figure 3 demonstrates the utility of the sequential Roughsort algorithm, which beats even the highly-optimized Mergesort from
-  the C\texttt{++} STL at handling the nearly-sorted input arrays.
-This victory is greatly overshadowed by the sequential Bubblesort, which is operating close to its optimal domain.
-
-The next battery of tests in Figure 4 raises $k$ to 15, causing the sequential Roughsort's advantage over Mergesort to evaporate.
-The parallel Roughsort generally outperforms Bubblesort here (which fairs better than expected against the sequential Mergesort
-  in a trend that can't last for much longer to the right of the graph) and defeats the sequential Roughsort.
-Unexpectedly, the parallel implementation exhibits about a factor-of-ten speedup over the $k = 2$ graph; this shows that
-  the overhead of launching many CUDA threads over small array subsequences substantially counterbalances the greater runtime
-  of sorting larger subsequences.
-
-Figures 5 and 6 fix $n$ and vary $k$, yielding similar results.
-For arrays of these lengths, the parallel Roughsort's crossover point lies somewhere around the interval $20 \leq k \leq 30$,
-  where it manages to best the three sequential algorithms.
-An invariant among all four graphs is the utter dominance of the parallel Mergesort implementation provided by \textit{Thrust},
-  whose runtimes never depart from the $x$-axis.
-
-These results suggest that our parallel Roughsort's constant runtime factor and crossover point are relatively high.
-We were unable to observe a benefit from its superior asymptotic bound over nearly-sorted arrays that could fit within the
-GPU's memory.
-
-\begin{sidewaysfigure}
-\input{plots/k2}
-\vspace{-4ex}
-\caption{\label{fig:k2}{\em
-  Sort Runtimes over Arrays of Length $n\cdot 10^6$, $k = 2$
-}}
-\end{sidewaysfigure}
-
-\begin{sidewaysfigure}
-\input{plots/k15}
-\vspace{-4ex}
-\caption{\label{fig:k15}{\em
-  Sort Runtimes over Arrays of Length $n\cdot 10^6$, $k = 15$
-}}
-\end{sidewaysfigure}
-
-\begin{sidewaysfigure}
-\input{plots/n750k}
-\vspace{-4ex}
-\caption{\label{fig:n750k}{\em
-  Sort Runtimes over Arrays of Radius $k$, $n = 0.75\cdot 10^6$
-}}
-\end{sidewaysfigure}
-
-\begin{sidewaysfigure}
-\input{plots/n1250k}
-\vspace{-4ex}
-\caption{\label{fig:n1250k}{\em
-  Sort Runtimes over Arrays of Radius $k$, $n = 1.25\cdot 10^6$
-}}
-\end{sidewaysfigure}
-
-\clearpage
-\section{Explanation of Results}
-  The source papers theorized that parallel radius finding would run at a $O(\lg(k))$ bound, so these contrary result must then be explained.  
-  There are several possible reasons for this which should be considered, as there are similarities but also differences between GPU and the 
-  assumed CRCW PRAM.
-    Given many GPU processor threads may update multiple memory locations simultaneously, and likewise many memory locations may be read in 
-  parallel on GPU, the underlying NVIDIA hardware that CUDA provides access to is reminiscent of CRCW PRAM.  However, GPUs differ from true
-  CRCW PRAM in fundamental ways.  First, GPU memory is finite, while PRAM is of arbitrary size.  Furthermore, for GPU memory access times to
-  provide the concurrent read and write characteristics reminiscent of PRAM, these memory operations must be performed on contiguous portions
-  of GPU memory in a \textit{coalescing manner}, whereas CRCW PRAM has no such ordering limitation.  Foremost in the differences between CRCW
-  PRAM and GPU architectures however is the warp divergence concept addressed above.  What this implies for memory operations is that workloads
-  exist which may prevent all but one thread in a warp from performing a memory operation at a particular time.  Consequently, there are
-  practical limitations to what a GPU may achieve, and these limitations restrict the workloads which are practical to run on a GPU.  Not 
-  only must a GPU workload constrain its memory usage within practical limitations, the accesses to that memory must be orderly, and the 
-  underlying algorithm performing those accesses must be amenable to parallelization on GPU if the advantages of GPU processing over CPU 
-  processing are to be realized\cite{dehne2010exploring}.
-  Likewise, while the parallel Roughsort results were more in line with expectations, that it failed to best the heavily optimized \texttt{Thrust}
-  Mergesort implementation confirms that issues impacting parallel radius finding similarly affect parallel Roughsort's performance.
-
-\section{Conclusion and Further Research}
-  Ultimately, results for this project did not result in a parallel Roughsort implementation which convincingly bested other comparison sort 
-  algorithms. Most problematic was the linear performance of the parallel radius finder, which was expected to run in logarithmic time.  Roughsort
-  results were encouraging, but ultimately parallel Mergesort dominated on all tested values of $k$, demonstrating the impracticality of the
-  parallel Roughsort implementation for workloads which would clearly benefit more from parallel Mergesort.  The authors posit that this is 
-  largely a consequence of the differences between CRCW PRAM and the practical limitations of Nvidia GPU architectures.  
-  In the same vein, sequential Roughsort was bested in the domain of low $k$ values by Bubblesort, due to Bubblesort's expected good performance
-  on nearly sorted sequences, closing off yet another avenue in which Roughsort might have utility.
-  
-  However, as a first implementation, this contributes to the body of work and provides several future avenues for exploration and possible 
-  improvement over these results.
-  The practical considerations of the GPU hardware were not explicitly addressed while architecting and designing parallel implementations of
-  the mentioned algorithms.  The dominating \texttt{Thrust} Mergesort implementation was once in the same situation, where additional optimizations
-  were discovered and then implemented.  Work may now be done to coalesce memory access requests across threads in the aforementioned payloads.
-  Likewise, optimizations which might have the algorithms take advantage of more performant thread-local memory, specify beneficial cache 
-  parameters, avoid warp divergence, and generally address practical constraints of the GPU can now be investigated \cite{cuda}.  Further 
-  exploration may also be undertaken into CUDA implementations of CRCW parallel algorithms which might address the limitations seen in these 
-  results.  For instance, an implementation of Cole's parallel median algorithm might enable a more efficient parallel Roughsort\cite{cole85}.
-  
-  Finally, this body of work introduces a useful concept: the $k$ value.  Not only does determining the radius of a sequence provide for the 
-  possibility of selecting the best sorting algorithm for the situation, being able to generate sequences with an arbitrary $k$ value is useful
-  in the testing and evaluation of sorting algorithms, as was done here.  Not only could this work be cumulatively used to implement sorting 
-  techniques which select the optimal algorithm for the situation based on the $k$ value, evaluation of sorting algorithms becomes more scientific
-  and thus effective.
-
-\clearpage
 \bibliographystyle{plain}
 \nocite{*}
 \bibliography{refs} % bib database
